@@ -44,6 +44,7 @@ seedIfEmpty();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/leads', function(req, res) {
   const db = readDB();
