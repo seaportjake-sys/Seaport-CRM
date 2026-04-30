@@ -196,6 +196,33 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg
 .empty-ico{font-size:48px;margin-bottom:12px}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
 @keyframes spin{to{transform:rotate(360deg)}}
+.apr-wrap{padding:16px;display:flex;flex-direction:column;gap:14px}
+.apr-result{background:var(--navy);border-radius:16px;padding:16px;color:white}
+.apr-ttl{font-size:11px;font-weight:700;color:var(--gold);letter-spacing:1px;margin-bottom:12px;text-transform:uppercase}
+.apr-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.apr-row:last-child{border-bottom:none;margin-top:4px;padding-top:10px}
+.apr-lbl{font-size:13px;color:rgba(255,255,255,.7)}
+.apr-val{font-size:15px;font-weight:700;color:white}
+.apr-val.gold{color:var(--gold)}.apr-val.green{color:#4ADE80}.apr-val.red{color:#F87171}
+.apr-note{font-size:11px;color:rgba(255,255,255,.5);margin-top:4px;font-style:italic}
+.elec-wrap{padding:16px;display:flex;flex-direction:column;gap:14px}
+.pkg-row{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.pkg-row::-webkit-scrollbar{display:none}
+.pkg-btn{flex-shrink:0;padding:10px 16px;border-radius:12px;border:2px solid var(--border);background:white;font-size:13px;font-weight:700;cursor:pointer;color:var(--navy)}
+.pkg-btn.active{border-color:var(--gold);background:var(--gold);color:var(--navy)}
+.elec-section{background:white;border-radius:14px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:8px}
+.elec-sec-hdr{background:var(--navy);padding:10px 14px}
+.elec-sec-ttl{color:var(--gold);font-weight:700;font-size:13px;letter-spacing:.5px}
+.elec-item{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.elec-item:last-child{border-bottom:none}
+.elec-chk{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;background:white}
+.elec-chk.checked{background:var(--navy);border-color:var(--navy);color:white}
+.elec-info{flex:1}.elec-name{font-size:13px;font-weight:600;color:var(--navy)}
+.elec-brand{font-size:11px;color:var(--gray);margin-top:1px}
+.elec-price{font-size:13px;font-weight:700;color:var(--navy);flex-shrink:0}
+.elec-total-box{background:var(--navy);border-radius:14px;padding:16px;color:white;display:flex;justify-content:space-between;align-items:center}
+.elec-total-lbl{font-size:13px;color:rgba(255,255,255,.7)}
+.elec-total-val{font-size:24px;font-weight:700;color:var(--gold)}
 </style>
 </head>
 <body>
@@ -240,6 +267,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg
     <button class="tpill" data-filter="Warm" onclick="filterLeads('Warm',this)">✅ Warm <span class="tc" id="tc-Warm">0</span></button>
     <button class="tpill" data-filter="Cold" onclick="filterLeads('Cold',this)">❄️ Cold <span class="tc" id="tc-Cold">0</span></button>
     <button class="tpill" data-filter="Dead" onclick="filterLeads('Dead',this)">☠️ Dead <span class="tc" id="tc-Dead">0</span></button>
+    <button class="tpill" data-filter="FollowUpToday" onclick="filterLeads('FollowUpToday',this)">📅 Follow Up Today <span class="tc" id="tc-FollowUpToday">0</span></button>
+    <button class="tpill" data-filter="NeedsContact" onclick="filterLeads('NeedsContact',this)">⚠️ Needs Contact <span class="tc" id="tc-NeedsContact">0</span></button>
   </div>
   <div class="search-wrap">
     <input class="search-inp" id="leadSearch" placeholder="🔍  Search leads, boats, salespeople..." oninput="renderLeads()">
@@ -281,6 +310,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg
     <div style="font-size:11px;font-weight:700;color:var(--gray);letter-spacing:1px;text-transform:uppercase;padding:4px 0">Sales Tools</div>
     <button class="act" style="background:var(--navy);color:var(--gold);justify-content:flex-start;padding:16px" onclick="showTool('deal')">💰 Deal Builder</button>
     <button class="act" style="background:var(--navy);color:var(--gold);justify-content:flex-start;padding:16px" onclick="showTool('payment')">📊 Payment Calculator</button>
+    <button class="act" style="background:var(--cold-bg);color:var(--cold-tx);justify-content:flex-start;padding:16px" onclick="showTool('appraisal')">🔍 Trade-In Appraisal</button>
+    <button class="act" style="background:var(--green-bg);color:var(--green);justify-content:flex-start;padding:16px" onclick="showTool('electronics')">🎛️ Electronics Builder</button>
     <div style="font-size:11px;font-weight:700;color:var(--gray);letter-spacing:1px;text-transform:uppercase;padding:8px 0 4px">Data</div>
     <button class="act" style="background:var(--cold-bg);color:var(--cold-tx);justify-content:flex-start;padding:16px" onclick="doRollover()">🔄 Run Daily Rollover (Flag Overdue)</button>
     <button class="act" style="background:var(--green-bg);color:var(--green);justify-content:flex-start;padding:16px" onclick="importDetailingData()">📥 Import Detailing Sheet</button>
@@ -539,9 +570,20 @@ function updateStats() {
   const hot = leads.filter(l => l.status === 'Hot').length;
   const warm = leads.filter(l => l.status === 'Warm').length;
   const cold = leads.filter(l => l.status === 'Cold').length;
-  const dead = leads.filter(l => l.status === 'Dead').length;
   const todayStr = today();
-  const due = leads.filter(l => l.followUpDate && l.followUpDate <= todayStr && l.status !== 'Dead').length;
+
+  const followUpToday = leads.filter(l =>
+    l.status !== 'Dead' && l.followUpDate && l.followUpDate <= todayStr
+  ).length;
+
+  const needsContact = leads.filter(l => {
+    if (l.status === 'Dead') return false;
+    const d = daysUntil(l.followUpDate);
+    const noFU = !l.followUpDate;
+    const overdue = d !== null && d < -1;
+    const noRecentContact = !l.lastContactDate || daysUntil(l.lastContactDate) < -7;
+    return noFU || overdue || noRecentContact;
+  }).length;
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat" style="border-color:var(--hot)" onclick="filterLeads('Hot',document.querySelector('[data-filter=Hot]'))">
@@ -550,16 +592,21 @@ function updateStats() {
       <div class="stat-n" style="color:var(--warm)">${warm}</div><div class="stat-l">WARM</div></div>
     <div class="stat" style="border-color:var(--cold)" onclick="filterLeads('Cold',document.querySelector('[data-filter=Cold]'))">
       <div class="stat-n" style="color:var(--cold)">${cold}</div><div class="stat-l">COLD</div></div>
-    <div class="stat" style="border-color:var(--red)" onclick="filterLeads('All',document.querySelector('[data-filter=All]'))">
-      <div class="stat-n" style="color:var(--red)">${due}</div><div class="stat-l">DUE TODAY</div></div>
+    <div class="stat" style="border-color:var(--hot)" onclick="filterLeads('FollowUpToday',document.querySelector('[data-filter=FollowUpToday]'))">
+      <div class="stat-n" style="color:var(--hot)">${followUpToday}</div><div class="stat-l">FOLLOW UP TODAY</div></div>
+    <div class="stat" style="border-color:var(--red)" onclick="filterLeads('NeedsContact',document.querySelector('[data-filter=NeedsContact]'))">
+      <div class="stat-n" style="color:var(--red)">${needsContact}</div><div class="stat-l">NEEDS CONTACT</div></div>
     <div class="stat" style="border-color:var(--border)">
       <div class="stat-n">${leads.length}</div><div class="stat-l">TOTAL</div></div>`;
 
   ['All','Hot','Warm','Cold','Dead'].forEach(f => {
     const el = document.getElementById('tc-' + f);
-    if (el) el.textContent = f === 'All' ? leads.length :
-      leads.filter(l => l.status === f).length;
+    if (el) el.textContent = f === 'All' ? leads.length : leads.filter(l => l.status === f).length;
   });
+  const fuEl = document.getElementById('tc-FollowUpToday');
+  if (fuEl) fuEl.textContent = followUpToday;
+  const ncEl = document.getElementById('tc-NeedsContact');
+  if (ncEl) ncEl.textContent = needsContact;
 
   const hotBadge = document.getElementById('hotBadge');
   if (hot > 0) { hotBadge.textContent = hot; hotBadge.style.display = ''; }
@@ -575,12 +622,32 @@ function filterLeads(filter, btn) {
 
 function renderLeads() {
   const q = (document.getElementById('leadSearch').value || '').toLowerCase();
+  const todayStr = today();
   let list = leads.filter(l => {
+    if (activeLeadFilter === 'FollowUpToday') {
+      if (l.status === 'Dead') return false;
+      return l.followUpDate && l.followUpDate <= todayStr;
+    }
+    if (activeLeadFilter === 'NeedsContact') {
+      if (l.status === 'Dead') return false;
+      const d = daysUntil(l.followUpDate);
+      // No follow-up set, or overdue by more than 1 day, or no contact in 7+ days
+      const noFU = !l.followUpDate;
+      const overdue = d !== null && d < -1;
+      const noRecentContact = !l.lastContactDate || daysUntil(l.lastContactDate) < -7;
+      return noFU || overdue || noRecentContact;
+    }
     if (activeLeadFilter !== 'All' && l.status !== activeLeadFilter) return false;
     if (!q) return true;
     return [l.name, l.boat, l.salesperson, l.phone, l.email, l.notes]
       .some(v => v && v.toLowerCase().includes(q));
   });
+
+  // Apply search on top of special filters too
+  if (q && (activeLeadFilter === 'FollowUpToday' || activeLeadFilter === 'NeedsContact')) {
+    list = list.filter(l => [l.name, l.boat, l.salesperson, l.phone, l.email, l.notes]
+      .some(v => v && v.toLowerCase().includes(q)));
+  }
 
   const wrap = document.getElementById('leadsList');
   if (!list.length) {
@@ -624,6 +691,10 @@ function renderLeads() {
 }
 
 function renderLeadDetail(l) {
+  const days = daysUntil(l.followUpDate);
+  const overdue = l.status !== 'Dead' && days !== null && days < 0;
+  const fuColor = overdue ? 'var(--red)' : days === 0 ? 'var(--hot)' : days !== null && days <= 3 ? 'var(--amber)' : 'var(--navy)';
+  const fuText = !l.followUpDate ? 'Not set' : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : overdue ? `${Math.abs(days)}d overdue` : `in ${days}d`;
   return `
   <div class="detail-wrap">
     <div class="dsec">
@@ -641,8 +712,20 @@ function renderLeadDetail(l) {
         <div class="iitem"><div class="ilbl">TRADE-IN</div><div class="ival">${l.tradeIn || '—'}</div></div>
         <div class="iitem"><div class="ilbl">PHONE</div><div class="ival">${l.phone || '—'}</div></div>
         <div class="iitem"><div class="ilbl">EMAIL</div><div class="ival" style="font-size:11px;word-break:break-all">${l.email || '—'}</div></div>
-        <div class="iitem"><div class="ilbl">FOLLOW-UP</div><div class="ival">${fmtDate(l.followUpDate)}</div></div>
         <div class="iitem"><div class="ilbl">SALESPERSON</div><div class="ival">${l.salesperson || '—'}</div></div>
+        <div class="iitem"><div class="ilbl">FOLLOW-UP</div><div class="ival" style="color:${fuColor}">${fuText}</div></div>
+      </div>
+    </div>
+    <div class="dsec">
+      <div class="ds-title">Next Follow-Up Date</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="fuDate-${l.id}" value="${l.followUpDate || ''}" style="flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);font-size:14px;background:white;color:var(--navy);outline:none">
+        <button onclick="setFollowUp(${l.id})" style="padding:10px 16px;border-radius:10px;background:var(--navy);color:var(--gold);border:none;font-size:13px;font-weight:700;cursor:pointer">Set Date</button>
+        <button onclick="setFollowUpDays(${l.id},1)" style="padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber);font-size:12px;font-weight:700;cursor:pointer">+1d</button>
+        <button onclick="setFollowUpDays(${l.id},3)" style="padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber);font-size:12px;font-weight:700;cursor:pointer">+3d</button>
+        <button onclick="setFollowUpDays(${l.id},7)" style="padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber);font-size:12px;font-weight:700;cursor:pointer">+1wk</button>
+        <button onclick="setFollowUpDays(${l.id},14)" style="padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber);font-size:12px;font-weight:700;cursor:pointer">+2wk</button>
+        <button onclick="setFollowUpDays(${l.id},30)" style="padding:10px 12px;border-radius:10px;background:var(--amber-bg);color:var(--amber);border:1.5px solid var(--amber);font-size:12px;font-weight:700;cursor:pointer">+30d</button>
       </div>
     </div>
     <div class="dsec">
@@ -670,7 +753,13 @@ function renderLeadDetail(l) {
           <input class="ldate-i" type="date" id="logDate-${l.id}" value="${today()}">
         </div>
         <textarea class="ltxt" id="logNote-${l.id}" rows="2" placeholder="What was discussed..."></textarea>
-        <button class="btn-log" onclick="logContact(${l.id})">Log Contact</button>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+          <label style="font-size:12px;color:var(--gray);font-weight:600;white-space:nowrap">Next follow-up:</label>
+          <input type="date" id="logNextFU-${l.id}" style="flex:1;padding:9px 12px;border-radius:9px;border:1.5px solid var(--border);font-size:13px;background:white;color:var(--navy);outline:none">
+          <button onclick="setFollowUpDays(${l.id},3,true)" style="padding:9px 10px;border-radius:9px;background:var(--bg);color:var(--gray);border:1.5px solid var(--border);font-size:11px;font-weight:700;cursor:pointer">+3d</button>
+          <button onclick="setFollowUpDays(${l.id},7,true)" style="padding:9px 10px;border-radius:9px;background:var(--bg);color:var(--gray);border:1.5px solid var(--border);font-size:11px;font-weight:700;cursor:pointer">+7d</button>
+        </div>
+        <button class="btn-log" onclick="logContact(${l.id})">Log Contact &amp; Update Follow-Up</button>
       </div>
     </div>
     <div class="dsec" id="logHist-${l.id}">
@@ -729,20 +818,79 @@ async function logContact(id) {
   const type = document.getElementById('logType-' + id)?.value;
   const date = document.getElementById('logDate-' + id)?.value;
   const notes = document.getElementById('logNote-' + id)?.value;
+  const nextFU = document.getElementById('logNextFU-' + id)?.value;
   if (!type) return;
   try {
+    // Log the contact
     const updated = await apiFetch('/api/leads/' + id + '/log', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ contactType: type, contactDate: date, notes })
     });
+    // If a next follow-up date was set, patch the lead to update it
+    let final = updated;
+    if (nextFU) {
+      final = await apiFetch('/api/leads/' + id, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ followUpDate: nextFU })
+      });
+    }
+    const idx = leads.findIndex(l => l.id === id);
+    if (idx !== -1) leads[idx] = final;
+    renderLeads();
+    updateStats();
+    showToast('Contact logged ✓' + (nextFU ? ' · Follow-up set' : ''));
+    loadLogHistory(id);
+  } catch(e) { showToast('Error logging contact'); }
+}
+
+async function setFollowUp(id, fromLogSection) {
+  const inputId = fromLogSection ? 'logNextFU-' + id : 'fuDate-' + id;
+  const date = document.getElementById(inputId)?.value;
+  if (!date) { showToast('Pick a date first'); return; }
+  try {
+    const updated = await apiFetch('/api/leads/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ followUpDate: date })
+    });
     const idx = leads.findIndex(l => l.id === id);
     if (idx !== -1) leads[idx] = updated;
     renderLeads();
     updateStats();
-    showToast('Contact logged ✓');
+    showToast('Follow-up set to ' + fmtDate(date));
     loadLogHistory(id);
-  } catch(e) { showToast('Error logging contact'); }
+  } catch(e) { showToast('Error updating follow-up'); }
+}
+
+async function setFollowUpDays(id, days, fillOnly) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const dateStr = d.toISOString().split('T')[0];
+  // If fillOnly = true, just fill the input in the log section (don't save yet)
+  if (fillOnly) {
+    const el = document.getElementById('logNextFU-' + id);
+    if (el) el.value = dateStr;
+    return;
+  }
+  // Otherwise immediately save
+  try {
+    const updated = await apiFetch('/api/leads/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ followUpDate: dateStr })
+    });
+    const idx = leads.findIndex(l => l.id === id);
+    if (idx !== -1) leads[idx] = updated;
+    // Also update the date input so user sees what was set
+    const el = document.getElementById('fuDate-' + id);
+    if (el) el.value = dateStr;
+    renderLeads();
+    updateStats();
+    showToast('Follow-up set: ' + fmtDate(dateStr));
+    loadLogHistory(id);
+  } catch(e) { showToast('Error setting follow-up'); }
 }
 
 async function deleteLead(id) {
@@ -1151,7 +1299,137 @@ function showTool(name) {
         <div class="pay-breakdown" id="payBreak"></div>
       </div>
     </div>`;
+  } else if (name === 'appraisal') {
+    wrap.innerHTML = `
+    <div class="apr-wrap">
+      <div style="font-size:14px;font-weight:700;color:var(--navy)">Trade-In Appraisal</div>
+      <div class="frow2">
+        <div class="fgroup"><label class="flbl">Year</label><input class="finp" id="ap-year" type="number" placeholder="2018" oninput="calcAppraisal()"></div>
+        <div class="fgroup"><label class="flbl">Make</label><input class="finp" id="ap-make" placeholder="Cape Horn" oninput="calcAppraisal()"></div>
+      </div>
+      <div class="frow2">
+        <div class="fgroup"><label class="flbl">Length (ft)</label><input class="finp" id="ap-len" type="number" placeholder="27" oninput="calcAppraisal()"></div>
+        <div class="fgroup"><label class="flbl">Engine Hours</label><input class="finp" id="ap-hrs" type="number" placeholder="450" oninput="calcAppraisal()"></div>
+      </div>
+      <div class="frow2">
+        <div class="fgroup"><label class="flbl">Condition</label>
+          <select class="finp" id="ap-cond" oninput="calcAppraisal()">
+            <option value="1.0">Excellent</option>
+            <option value="0.88" selected>Good</option>
+            <option value="0.75">Fair</option>
+            <option value="0.60">Poor</option>
+          </select>
+        </div>
+        <div class="fgroup"><label class="flbl">Trailer?</label>
+          <select class="finp" id="ap-trailer" oninput="calcAppraisal()">
+            <option value="0">No</option>
+            <option value="3500">Yes (+$3,500)</option>
+          </select>
+        </div>
+      </div>
+      <div class="apr-result" id="aprResult">
+        <div style="color:rgba(255,255,255,.4);font-size:13px">Enter boat details to estimate value...</div>
+      </div>
+    </div>`;
+  } else if (name === 'electronics') {
+    window._elecItems = [
+      {cat:'Chartplotters',items:[
+        {name:'Garmin GPSMAP 923xsv 9"',brand:'Garmin',price:1299,checked:false},
+        {name:'Garmin GPSMAP 1023xsv 10"',brand:'Garmin',price:1599,checked:false},
+        {name:'Raymarine Axiom+ 9',brand:'Raymarine',price:1199,checked:false},
+        {name:'Simrad GO9 XSE',brand:'Simrad',price:999,checked:false},
+      ]},
+      {cat:'VHF Radios',items:[
+        {name:'Standard Horizon GX2400',brand:'Standard Horizon',price:269,checked:false},
+        {name:'Garmin VHF 215i',brand:'Garmin',price:329,checked:false},
+        {name:'Icom M330G',brand:'Icom',price:189,checked:false},
+      ]},
+      {cat:'Autopilot',items:[
+        {name:'Garmin Reactor 40 Hydraulic',brand:'Garmin',price:2499,checked:false},
+        {name:'Simrad AP44 Pack',brand:'Simrad',price:1899,checked:false},
+        {name:'Raymarine Evolution EV-100',brand:'Raymarine',price:1499,checked:false},
+      ]},
+      {cat:'Audio',items:[
+        {name:'JL Audio MM100S-B Stereo',brand:'JL Audio',price:449,checked:false},
+        {name:'JL Audio M3-770X-S Speakers (pair)',brand:'JL Audio',price:329,checked:false},
+        {name:'JL Audio MX280/4 Amp',brand:'JL Audio',price:499,checked:false},
+        {name:'Wet Sounds REVO 8 Sub',brand:'Wet Sounds',price:599,checked:false},
+      ]},
+      {cat:'Safety & Nav',items:[
+        {name:'ACR EPIRB Cat II',brand:'ACR',price:289,checked:false},
+        {name:'Navionics+ Chart Card',brand:'Navionics',price:149,checked:false},
+        {name:'Garmin Striker 4 Backup Cam',brand:'Garmin',price:179,checked:false},
+      ]},
+    ];
+    renderElectronics();
   }
+}
+
+function renderElectronics() {
+  const items = window._elecItems || [];
+  const total = items.reduce((s,cat) => s + cat.items.filter(i=>i.checked).reduce((a,i)=>a+i.price,0), 0);
+  document.getElementById('toolContent').innerHTML = `
+  <div class="elec-wrap">
+    <div style="font-size:14px;font-weight:700;color:var(--navy);padding:0 0 4px">Electronics Builder</div>
+    ${items.map((cat,ci) => `
+    <div class="elec-section">
+      <div class="elec-sec-hdr"><span class="elec-sec-ttl">${cat.cat}</span></div>
+      ${cat.items.map((item,ii) => `
+      <div class="elec-item">
+        <div class="elec-chk ${item.checked?'checked':''}" onclick="toggleElec(${ci},${ii})">${item.checked?'✓':''}</div>
+        <div class="elec-info">
+          <div class="elec-name">${item.name}</div>
+          <div class="elec-brand">${item.brand}</div>
+        </div>
+        <div class="elec-price">${fmt$(item.price)}</div>
+      </div>`).join('')}
+    </div>`).join('')}
+    <div class="elec-total-box">
+      <span class="elec-total-lbl">Electronics Total</span>
+      <span class="elec-total-val">${fmt$(total)}</span>
+    </div>
+    <button onclick="sendElecsToDeal()" style="width:100%;padding:14px;border-radius:12px;background:var(--gold);color:var(--navy);border:none;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px">Send to Deal Builder →</button>
+  </div>`;
+}
+
+function toggleElec(ci, ii) {
+  if (window._elecItems && window._elecItems[ci]) {
+    window._elecItems[ci].items[ii].checked = !window._elecItems[ci].items[ii].checked;
+    renderElectronics();
+  }
+}
+
+function sendElecsToDeal() {
+  const total = (window._elecItems||[]).reduce((s,cat)=>s+cat.items.filter(i=>i.checked).reduce((a,i)=>a+i.price,0),0);
+  showTool('deal');
+  setTimeout(()=>{ const el = document.getElementById('db-elec'); if(el){el.value=total;calcDeal();} },150);
+  showToast('Electronics added to Deal Builder ✓');
+}
+
+function calcAppraisal() {
+  const year = parseInt(document.getElementById('ap-year')?.value)||0;
+  const len = parseInt(document.getElementById('ap-len')?.value)||0;
+  const hrs = parseInt(document.getElementById('ap-hrs')?.value)||0;
+  const cond = parseFloat(document.getElementById('ap-cond')?.value)||0.88;
+  const trailer = parseInt(document.getElementById('ap-trailer')?.value)||0;
+  if (!year || !len) return;
+  const age = new Date().getFullYear() - year;
+  const basePerFt = len<=20?3200:len<=25?4100:len<=30?5200:len<=35?7500:10000;
+  const base = len * basePerFt;
+  const ageFactor = Math.max(0.25, 1-(age*0.065));
+  const hrsFactor = hrs<200?1.0:hrs<500?0.95:hrs<1000?0.87:hrs<1500?0.78:0.68;
+  const est = Math.round(base*ageFactor*hrsFactor*cond/500)*500;
+  const low = Math.round(est*0.88/500)*500;
+  const high = Math.round(est*1.08/500)*500;
+  const retail = Math.round(est*1.18/500)*500;
+  const condLabels = {'1.0':'Excellent','0.88':'Good','0.75':'Fair','0.60':'Poor'};
+  document.getElementById('aprResult').innerHTML = `
+    <div class="apr-ttl">Estimated Trade-In Value</div>
+    <div class="apr-row"><span class="apr-lbl">Wholesale Low</span><span class="apr-val red">${fmt$(low+trailer)}</span></div>
+    <div class="apr-row"><span class="apr-lbl">Trade-In Range</span><span class="apr-val gold">${fmt$(low+trailer)} – ${fmt$(high+trailer)}</span></div>
+    <div class="apr-row"><span class="apr-lbl">Retail Est.</span><span class="apr-val green">${fmt$(retail+trailer)}</span></div>
+    ${trailer?`<div class="apr-row"><span class="apr-lbl">Trailer Included</span><span class="apr-val">+ ${fmt$(trailer)}</span></div>`:''}
+    <div class="apr-note">Estimate only — verify with BUC Book or NADA. ${age}yr old · ${hrs} hrs · ${condLabels[String(cond)]||'Good'} condition.</div>`;
 }
 
 function calcDeal() {
