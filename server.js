@@ -5,22 +5,18 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_FILE = process.env.DB_PATH || '/data/crm.db.json';
+const DB_FILE = process.env.DB_PATH || '/Data/crm.db.json';
 
 function readDB() {
   try {
-    if (fs.existsSync(DB_FILE)) {
-      return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-    }
+    if (fs.existsSync(DB_FILE)) return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
   } catch(e) {}
-  return { leads: [], logs: [], nextId: 1 };
+  return { leads: [], logs: [], deals: [], nextLeadId: 1, nextDealId: 1 };
 }
 
 function writeDB(data) {
   const dir = path.dirname(DB_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
@@ -35,16 +31,18 @@ function seedIfEmpty() {
     {id:4,name:"Chris Fabian",phone:"609-555-0238",email:"cfabian@icloud.com",boat:"2025 North Coast 245",budget:88000,tradeIn:"",salesperson:"Rob",status:"Warm",lastContactDate:"2025-04-18",lastContactType:"Call",notes:"First time buyer. Needs warranty info.",followUpDate:"2025-04-30",attachments:[],createdAt:now},
     {id:5,name:"Joe Santangelo",phone:"732-555-0754",email:"",boat:"2025 Cape Horn 24OS",budget:72000,tradeIn:"2017 Mako 214",salesperson:"Jake",status:"Warm",lastContactDate:"2025-04-20",lastContactType:"Text",notes:"Has Mako trade. Waiting on insurance quote.",followUpDate:"2025-05-02",attachments:[],createdAt:now}
   ];
-  db.nextId = 6;
+  db.nextLeadId = 6;
+  db.deals = [];
+  db.nextDealId = 1;
   writeDB(db);
 }
 
 seedIfEmpty();
-
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// LEADS
 app.get('/api/leads', function(req, res) {
   const db = readDB();
   res.json(db.leads.slice().reverse());
@@ -54,8 +52,8 @@ app.post('/api/leads', function(req, res) {
   const db = readDB();
   if (!req.body.name) return res.status(400).json({ error: 'Name required' });
   const lead = Object.assign({}, req.body, {
-    id: db.nextId++,
-    attachments: [],
+    id: db.nextLeadId++,
+    attachments: req.body.attachments || [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
@@ -87,15 +85,12 @@ app.post('/api/leads/:id/log', function(req, res) {
   const db = readDB();
   const id = parseInt(req.params.id);
   if (!db.logs) db.logs = [];
-  const entry = Object.assign({ id: Date.now(), leadId: id }, req.body, { loggedAt: new Date().toISOString() });
-  db.logs.push(entry);
+  db.logs.push(Object.assign({ id: Date.now(), leadId: id }, req.body, { loggedAt: new Date().toISOString() }));
   const idx = db.leads.findIndex(function(l) { return l.id === id; });
   if (idx !== -1) {
     db.leads[idx].lastContactType = req.body.contactType;
     db.leads[idx].lastContactDate = req.body.contactDate;
-    if (req.body.notes && req.body.notes.trim()) {
-      db.leads[idx].notes = req.body.notes;
-    }
+    if (req.body.notes && req.body.notes.trim()) db.leads[idx].notes = req.body.notes;
     db.leads[idx].updatedAt = new Date().toISOString();
   }
   writeDB(db);
@@ -105,8 +100,45 @@ app.post('/api/leads/:id/log', function(req, res) {
 app.get('/api/leads/:id/log', function(req, res) {
   const db = readDB();
   const id = parseInt(req.params.id);
-  const logs = (db.logs || []).filter(function(l) { return l.leadId === id; }).reverse();
-  res.json(logs);
+  res.json((db.logs || []).filter(function(l) { return l.leadId === id; }).reverse());
+});
+
+// DEALS
+app.get('/api/deals', function(req, res) {
+  const db = readDB();
+  res.json((db.deals || []).slice().reverse());
+});
+
+app.post('/api/deals', function(req, res) {
+  const db = readDB();
+  if (!db.deals) db.deals = [];
+  if (!db.nextDealId) db.nextDealId = 1;
+  const deal = Object.assign({}, req.body, {
+    id: db.nextDealId++,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  db.deals.push(deal);
+  writeDB(db);
+  res.json(deal);
+});
+
+app.patch('/api/deals/:id', function(req, res) {
+  const db = readDB();
+  const id = parseInt(req.params.id);
+  const idx = (db.deals||[]).findIndex(function(d) { return d.id === id; });
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  db.deals[idx] = Object.assign({}, db.deals[idx], req.body, { updatedAt: new Date().toISOString() });
+  writeDB(db);
+  res.json(db.deals[idx]);
+});
+
+app.delete('/api/deals/:id', function(req, res) {
+  const db = readDB();
+  const id = parseInt(req.params.id);
+  db.deals = (db.deals||[]).filter(function(d) { return d.id !== id; });
+  writeDB(db);
+  res.json({ ok: true });
 });
 
 app.get('*', function(req, res) {
