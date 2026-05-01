@@ -1,0 +1,18 @@
+{
+  "name": "seaport-crm",
+  "version": "1.0.0",
+  "description": "Lightweight, extensible CRM. Node/Express + Postgres + vanilla JS.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "migrate": "node server/migrate.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0"
+  }
+}
