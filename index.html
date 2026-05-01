@@ -1181,11 +1181,11 @@ function saveElecBuild(){
 function openAddSheet(){document.getElementById("addOverlay").classList.add("open");}
 function closeSheet(id){document.getElementById(id).classList.remove("open");}
 
-function submitLead(){
+async function submitLead(){
   const name=document.getElementById("fn").value.trim();
   if(!name){toast("Name is required");return;}
-  leads.unshift({
-    id:nextLeadId++,name,
+  const lead=await apiPost("/api/leads",{
+    name,
     phone:document.getElementById("fp").value,
     email:document.getElementById("fe").value,
     boat:document.getElementById("fboat").value,
@@ -1199,16 +1199,12 @@ function submitLead(){
     notes:document.getElementById("fnotes").value,
     attachments:[]
   });
+  leads.unshift(lead);
   closeSheet("addOverlay");
-  ["fn","fp","fe","fboat","fb","ftrade","ffollow","fnotes"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  ["fn","fp","fe","fboat","fb","ftrade","ffollow","fnotes"].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value="";
+  });
   document.getElementById("fdate").value=TODAY;
-  renderLeads();toast("Lead added ✓");
-}
-
-// ── INIT ───────────────────────────────────────────────────────────────────
-seedData();
-renderLeads();
-renderInventory();
-</script>
-</body>
-</html>
+  renderLeads();
+  toast("Lead added");
+}>
