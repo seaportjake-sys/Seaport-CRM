@@ -456,10 +456,11 @@ aside#sidebar { display: none; }
     min-height: 100vh;
     max-width: none;
   }
-  /* Topbar slimmed: sidebar shows the brand instead. */
+  /* Topbar slimmed: sidebar shows the brand instead. Auto-height — must NOT
+     use flex:1 here, that's a column-flex parent so it would stretch vertically. */
   header#topbar {
-    flex: 1; min-width: 0;
-    position: sticky; top: 0;
+    flex: 0 0 auto; min-width: 0;
+    position: sticky; top: 0; z-index: 10;
     padding: 14px 28px;
     background: #fff; color: var(--navy);
     border-bottom: 1px solid var(--border);
@@ -471,6 +472,7 @@ aside#sidebar { display: none; }
     flex: 1; font-size: 18px; font-weight: 700; color: var(--navy);
     text-transform: capitalize;
   }
+  header#topbar .topbar-user { display: none; } /* user chip lives in sidebar on desktop */
 
   /* Sidebar */
   aside#sidebar {
@@ -535,12 +537,14 @@ aside#sidebar { display: none; }
   nav#bottombar { display: none; }
 
   /* Content padding & limits */
-  .tab-page { max-width: 1100px; margin: 0 auto; width: 100%; padding: 0 28px 32px; }
-  .status-strip { padding: 18px 0 0; }
-  .filter-row    { padding: 16px 0 8px; }
-  .search { margin: 4px 0 16px; }
+  .tab-page { max-width: 1200px; margin: 0 auto; width: 100%; padding: 8px 28px 32px; }
+  /* On desktop the status strip and filters lay flat — no horizontal scroll. */
+  .status-strip { padding: 18px 0 0; flex-wrap: wrap; overflow: visible; }
+  .filter-row   { padding: 16px 0 8px; flex-wrap: wrap; overflow: visible; }
+  .search { margin: 4px 0 16px; max-width: 480px; }
   .cards { padding: 0; gap: 12px; }
-  .tools-list { padding: 4px 0 32px; }
+  .tools-list { padding: 4px 0 32px; max-width: 880px; margin: 0 auto; }
+  .status-card { flex: 0 0 auto; min-width: 130px; }
 
   /* Cards in a 2-column grid on big screens */
   @media (min-width: 1180px) {
@@ -550,9 +554,6 @@ aside#sidebar { display: none; }
   /* Modal centered, smaller corner radius */
   .overlay { align-items: center; }
   .sheet { border-radius: 16px; max-width: 640px; }
-
-  /* Status cards bigger on desktop */
-  .status-card { flex: 0 0 130px; }
 
   /* Topbar action button looks like a button on desktop */
   .topbar-action {
