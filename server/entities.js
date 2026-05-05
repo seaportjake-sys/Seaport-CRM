@@ -1,74 +1,87 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ENTITY DEFINITIONS — the single source of truth.
+// ENTITY DEFINITIONS — single source of truth for what persists in Postgres.
 //
-// Add a new feature (a new kind of record — contacts, tasks, accounts, etc.)
-// by adding one entry below. The server auto-creates the table + REST API,
-// and the frontend auto-renders a page, table, and form for it.
+// Adding/removing a field here is automatically picked up on next deploy:
+//   - migrate.js runs `ADD COLUMN IF NOT EXISTS` on every boot
+//   - crud.js exposes /api/{entity} for any entity here
 //
-// Field types supported by the UI: text, textarea, email, tel, number, date,
-// select, foreign (links to another entity by id).
-//
-// `listColumns` controls which fields show in the table view (defaults to all).
-// `titleField`  controls how rows are labelled in dropdowns / titles.
+// The frontend has hand-built views per tab, so adding a new entity here
+// won't auto-generate UI — but the API will be live for whatever you build.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const entities = {
   leads: {
     label: 'Leads',
-    icon: '👤',
-    titleField: 'name',
-    listColumns: ['name', 'company', 'email', 'status'],
     fields: [
-      { name: 'name',    label: 'Name',    type: 'text',     required: true },
-      { name: 'email',   label: 'Email',   type: 'email' },
-      { name: 'phone',   label: 'Phone',   type: 'tel' },
-      { name: 'company', label: 'Company', type: 'text' },
-      {
-        name: 'status', label: 'Status', type: 'select',
-        options: ['New', 'Contacted', 'Qualified', 'Unqualified', 'Lost'],
-        default: 'New',
-      },
-      { name: 'source',  label: 'Source',  type: 'text' },
-      { name: 'notes',   label: 'Notes',   type: 'textarea' },
+      { name: 'name',              type: 'text' },
+      { name: 'phone',             type: 'text' },
+      { name: 'email',             type: 'text' },
+      { name: 'budget',            type: 'number' },
+      { name: 'boat_interest',     type: 'text' },
+      { name: 'trade_in',          type: 'text' },
+      { name: 'salesperson',       type: 'text' },
+      { name: 'status',            type: 'text' },   // Hot / Warm / Cold
+      { name: 'first_contact_date',type: 'date' },
+      { name: 'last_contact_date', type: 'date' },
+      { name: 'contact_type',      type: 'text' },   // Call / Text / Email / In Person
+      { name: 'follow_up_date',    type: 'date' },
+      { name: 'notes',             type: 'textarea' },
+    ],
+  },
+
+  boats: {
+    label: 'Boats',
+    fields: [
+      { name: 'year',          type: 'number' },
+      { name: 'make',          type: 'text' },
+      { name: 'model',         type: 'text' },
+      { name: 'stock_number',  type: 'text' },
+      { name: 'price',         type: 'number' },
+      { name: 'cost',          type: 'number' },
+      { name: 'status',        type: 'text' },   // In Stock / Sold / On Order
+      { name: 'location',      type: 'text' },
+      { name: 'notes',         type: 'textarea' },
     ],
   },
 
   deals: {
     label: 'Deals',
-    icon: '💼',
-    titleField: 'title',
-    listColumns: ['title', 'value', 'stage', 'lead_id', 'close_date'],
     fields: [
-      { name: 'title',      label: 'Title',          type: 'text',   required: true },
-      { name: 'value',      label: 'Value ($)',      type: 'number' },
-      {
-        name: 'stage', label: 'Stage', type: 'select',
-        options: ['Prospect', 'Qualified', 'Proposal', 'Negotiation', 'Won', 'Lost'],
-        default: 'Prospect',
-      },
-      { name: 'lead_id',    label: 'Lead',           type: 'foreign', references: 'leads' },
-      { name: 'close_date', label: 'Expected close', type: 'date' },
-      { name: 'notes',      label: 'Notes',          type: 'textarea' },
+      { name: 'customer_name',   type: 'text' },
+      { name: 'lead_id',         type: 'foreign', references: 'leads' },
+      { name: 'boat',            type: 'text' },
+      { name: 'salesperson',     type: 'text' },
+      { name: 'sale_date',       type: 'date' },
+
+      { name: 'selling_price',   type: 'number' },
+      { name: 'doc_fees',        type: 'number' },
+      { name: 'finance_reserve', type: 'number' },
+      { name: 'trade_recouped',  type: 'number' },
+
+      { name: 'invoice_cost',    type: 'number' },
+      { name: 'trade_allowance', type: 'number' },
+      { name: 'rigging_prep',    type: 'number' },
+      { name: 'other_costs',     type: 'number' },
+
+      { name: 'status',          type: 'text' },   // Active / Sold / Lost
+      { name: 'notes',           type: 'textarea' },
     ],
   },
 
-  // ── EXAMPLE: uncomment to add a "tasks" feature ────────────────────────────
-  // tasks: {
-  //   label: 'Tasks',
-  //   icon: '✅',
-  //   titleField: 'title',
-  //   listColumns: ['title', 'due_date', 'done', 'lead_id'],
-  //   fields: [
-  //     { name: 'title',    label: 'Title',    type: 'text', required: true },
-  //     { name: 'due_date', label: 'Due',      type: 'date' },
-  //     { name: 'done',     label: 'Done',     type: 'select', options: ['No', 'Yes'], default: 'No' },
-  //     { name: 'lead_id',  label: 'Lead',     type: 'foreign', references: 'leads' },
-  //     { name: 'notes',    label: 'Notes',    type: 'textarea' },
-  //   ],
-  // },
+  electronics_builds: {
+    label: 'Electronics Builds',
+    fields: [
+      { name: 'customer_name', type: 'text' },
+      { name: 'boat',          type: 'text' },
+      { name: 'brand',         type: 'text' },   // Simrad / Garmin / Mixed
+      { name: 'preset',        type: 'text' },   // Basic / Mid Range / Full Offshore / Custom
+      { name: 'total',         type: 'number' },
+      { name: 'items',         type: 'textarea' }, // JSON string of line items
+      { name: 'notes',         type: 'textarea' },
+    ],
+  },
 };
 
-// Map UI field types to Postgres column types.
 const PG_TYPES = {
   text:     'TEXT',
   textarea: 'TEXT',

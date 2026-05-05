@@ -2,52 +2,270 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Seaport CRM</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#14253f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Seaport Inlet Marina · Sales</title>
   <link rel="stylesheet" href="/styles.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%E2%9A%93%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2314253f'/%3E%3Ctext x='32' y='42' font-size='28' text-anchor='middle' fill='%23c4a861'%3E%E2%9A%93%3C/text%3E%3C/svg%3E" />
 </head>
 <body>
-  <div id="app">
-    <aside id="sidebar">
-      <div class="brand">
-        <span class="brand-icon">⚓</span>
-        <span class="brand-text">Seaport CRM</span>
+
+<div id="app">
+
+  <!-- ── Header ────────────────────────────────────────────────────────── -->
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-logo" id="brand-logo">
+        <!-- Placeholder logo. Drop a real one at /public/logo.png and the JS
+             will swap this out automatically on load. -->
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-label="Seaport Inlet Marina">
+          <circle cx="32" cy="32" r="30" fill="#14253f"/>
+          <path d="M6 38 Q18 28 32 36 T58 36 L58 58 L6 58 Z" fill="#2e7d32"/>
+          <path d="M6 44 Q18 36 32 42 T58 44 L58 58 L6 58 Z" fill="#c4a861"/>
+          <path d="M6 50 Q18 44 32 48 T58 50 L58 58 L6 58 Z" fill="#d32f2f"/>
+          <text x="32" y="22" font-family="serif" font-size="9" text-anchor="middle" fill="#c4a861" font-weight="700" letter-spacing="1">SEAPORT</text>
+        </svg>
       </div>
-      <nav id="nav"></nav>
-      <div class="sidebar-footer">
-        <button id="logout-btn" class="link-btn" hidden>Log out</button>
+      <div class="brand-text">
+        <span class="brand-name">SEAPORT INLET MARINA</span>
+        <span class="brand-tag">SALES PLATFORM</span>
       </div>
-    </aside>
+    </div>
+    <button id="topbar-action" class="topbar-action" hidden></button>
+  </header>
 
-    <main id="main">
-      <header id="topbar">
-        <h1 id="page-title">Loading…</h1>
-        <button id="new-btn" class="primary" hidden>+ New</button>
-      </header>
-      <section id="content"></section>
-    </main>
-  </div>
+  <!-- ── Leads tab ─────────────────────────────────────────────────────── -->
+  <section class="tab-page active" id="page-leads">
+    <div class="status-strip" id="lead-status-strip"></div>
 
-  <!-- Login screen -->
-  <div id="login-overlay" class="overlay" hidden>
-    <form id="login-form" class="card">
-      <h2>Seaport CRM</h2>
-      <p>This CRM is password-protected.</p>
-      <label>
-        Password
-        <input type="password" id="login-password" autocomplete="current-password" required />
-      </label>
-      <div id="login-error" class="error" hidden></div>
-      <button class="primary" type="submit">Log in</button>
-    </form>
-  </div>
+    <div class="filter-row" id="lead-filter-row"></div>
 
-  <!-- Edit / create modal -->
-  <div id="modal-overlay" class="overlay" hidden>
-    <form id="record-form" class="card wide"></form>
-  </div>
+    <div class="search">
+      <span>🔎</span>
+      <input id="lead-search" type="search" placeholder="Search name or boat…" autocomplete="off" />
+    </div>
 
-  <script src="/app.js"></script>
+    <div class="cards" id="lead-cards"></div>
+  </section>
+
+  <!-- ── Boats tab ─────────────────────────────────────────────────────── -->
+  <section class="tab-page" id="page-boats">
+    <div class="filter-row" id="boat-filter-row"></div>
+    <div class="cards" id="boat-cards"></div>
+  </section>
+
+  <!-- ── Deals tab ─────────────────────────────────────────────────────── -->
+  <section class="tab-page" id="page-deals">
+    <div class="filter-row" id="deal-filter-row"></div>
+    <div class="cards" id="deal-cards"></div>
+  </section>
+
+  <!-- ── Tools tab ─────────────────────────────────────────────────────── -->
+  <section class="tab-page" id="page-tools">
+    <div class="section-heading">Tools</div>
+    <div class="tools-list">
+
+      <!-- Payment Calculator -->
+      <div class="tool-card" data-tool="payment">
+        <div class="tool-head">
+          <div class="tool-icon">🧮</div>
+          <div>
+            <div class="tool-title">Payment Calculator</div>
+            <div class="tool-sub">Monthly payment estimator with taxes and fees</div>
+          </div>
+          <div class="chev">▾</div>
+        </div>
+        <div class="tool-body">
+          <div class="form-grid">
+            <div class="field full">
+              <label class="field-label">Selling Price $</label>
+              <input id="pc-price" type="number" inputmode="decimal" placeholder="145000" />
+            </div>
+            <div class="field">
+              <label class="field-label">Down Payment $</label>
+              <input id="pc-down" type="number" inputmode="decimal" placeholder="20000" />
+            </div>
+            <div class="field">
+              <label class="field-label">Trade-in Value $</label>
+              <input id="pc-trade" type="number" inputmode="decimal" placeholder="0" />
+            </div>
+            <div class="field">
+              <label class="field-label">Interest Rate %</label>
+              <input id="pc-rate" type="number" inputmode="decimal" placeholder="7.99" />
+            </div>
+            <div class="field">
+              <label class="field-label">Term (months)</label>
+              <select id="pc-term">
+                <option value="60">60 mo (5yr)</option>
+                <option value="84" selected>84 mo (7yr)</option>
+                <option value="120">120 mo (10yr)</option>
+                <option value="180">180 mo (15yr)</option>
+                <option value="240">240 mo (20yr)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Sales Tax %</label>
+              <input id="pc-tax" type="number" inputmode="decimal" placeholder="6.625" />
+            </div>
+            <div class="field">
+              <label class="field-label">Doc / Fees $</label>
+              <input id="pc-fees" type="number" inputmode="decimal" placeholder="799" />
+            </div>
+          </div>
+          <div class="calc-result" id="pc-result">
+            <div class="label">Enter numbers above to calculate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trade-In Appraisal -->
+      <div class="tool-card theme-blue" data-tool="appraisal">
+        <div class="tool-head">
+          <div class="tool-icon">📊</div>
+          <div>
+            <div class="tool-title">Trade-In Appraisal</div>
+            <div class="tool-sub">Input BUC and NADA to get your offer range</div>
+          </div>
+          <div class="chev">▾</div>
+        </div>
+        <div class="tool-body">
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Year</label>
+              <input id="ap-year" type="number" inputmode="numeric" placeholder="2020" />
+            </div>
+            <div class="field">
+              <label class="field-label">Make &amp; Model</label>
+              <input id="ap-model" type="text" placeholder="Cape Horn 27XS" />
+            </div>
+            <div class="field">
+              <label class="field-label">Engine Hours</label>
+              <input id="ap-hours" type="number" inputmode="numeric" placeholder="350" />
+            </div>
+            <div class="field">
+              <label class="field-label">Condition</label>
+              <select id="ap-cond">
+                <option>Excellent</option>
+                <option selected>Good</option>
+                <option>Fair</option>
+                <option>Rough</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">BUC FMV $</label>
+              <input id="ap-buc" type="number" inputmode="decimal" placeholder="65000" />
+            </div>
+            <div class="field">
+              <label class="field-label">NADA Retail $</label>
+              <input id="ap-nada" type="number" inputmode="decimal" placeholder="71000" />
+            </div>
+            <div class="field full">
+              <label class="field-label">Recent Sale Comp $ (optional)</label>
+              <input id="ap-comp" type="number" inputmode="decimal" placeholder="68000" />
+            </div>
+          </div>
+          <div class="calc-result" id="ap-result">
+            <div class="label">Enter numbers above to calculate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Electronics Builder -->
+      <div class="tool-card theme-green" data-tool="electronics">
+        <div class="tool-head">
+          <div class="tool-icon">📡</div>
+          <div>
+            <div class="tool-title">Electronics Builder</div>
+            <div class="tool-sub">Build out a customer electronics package</div>
+          </div>
+          <div class="chev">▾</div>
+        </div>
+        <div class="tool-body">
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Customer</label>
+              <input id="el-customer" type="text" placeholder="Steve Arlotta" />
+            </div>
+            <div class="field">
+              <label class="field-label">Boat</label>
+              <input id="el-boat" type="text" placeholder="2025 Cape Horn 36T" />
+            </div>
+            <div class="field full">
+              <label class="field-label">Brand Preference</label>
+              <div class="choice-row" id="el-brand">
+                <button type="button" class="choice active" data-v="Simrad">Simrad</button>
+                <button type="button" class="choice" data-v="Garmin">Garmin</button>
+                <button type="button" class="choice" data-v="Mixed">Mixed</button>
+              </div>
+            </div>
+            <div class="field full">
+              <label class="field-label">Package Preset</label>
+              <div class="choice-row" id="el-preset">
+                <button type="button" class="choice active" data-v="Basic">Basic</button>
+                <button type="button" class="choice" data-v="Mid Range">Mid Range</button>
+                <button type="button" class="choice" data-v="Full Offshore">Full Offshore</button>
+                <button type="button" class="choice" data-v="Custom">Custom</button>
+              </div>
+            </div>
+          </div>
+          <div class="calc-result" id="el-result">
+            <div class="label">Estimated Package Total · Parts only, excl. labor</div>
+            <div class="big" id="el-total">$0</div>
+          </div>
+          <button class="btn-primary gold" id="el-save">💾 Save Build to Customer Profile</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+<!-- ── Bottom nav ─────────────────────────────────────────────────────── -->
+<nav id="bottombar">
+  <button class="nav-item active" data-tab="leads">
+    <span class="nav-icon">👥</span><span>LEADS</span>
+    <span class="badge" id="leads-badge" hidden>0</span>
+  </button>
+  <button class="nav-item" data-tab="boats">
+    <span class="nav-icon">🛥️</span><span>BOATS</span>
+  </button>
+  <button class="nav-item" data-tab="deals">
+    <span class="nav-icon">🤝</span><span>DEALS</span>
+  </button>
+  <button class="nav-item" data-tab="tools">
+    <span class="nav-icon">🧰</span><span>TOOLS</span>
+  </button>
+</nav>
+
+<!-- ── Login overlay ──────────────────────────────────────────────────── -->
+<div id="login-overlay" class="overlay" hidden style="align-items:center;">
+  <form id="login-form" class="login-card">
+    <div class="logo-wrap">
+      <div class="brand-logo" style="width:64px;height:64px;">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="30" fill="#14253f"/>
+          <path d="M6 38 Q18 28 32 36 T58 36 L58 58 L6 58 Z" fill="#2e7d32"/>
+          <path d="M6 44 Q18 36 32 42 T58 44 L58 58 L6 58 Z" fill="#c4a861"/>
+          <path d="M6 50 Q18 44 32 48 T58 50 L58 58 L6 58 Z" fill="#d32f2f"/>
+        </svg>
+      </div>
+    </div>
+    <h2 style="margin:0;text-align:center;">Seaport Inlet Marina</h2>
+    <p style="text-align:center;color:var(--muted);margin:0;">This CRM is password-protected.</p>
+    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" required />
+    <div id="login-error" style="color:var(--need);text-align:center;font-size:13px;" hidden></div>
+    <button class="btn-primary gold" type="submit">Log in</button>
+  </form>
+</div>
+
+<!-- ── Modal sheet (reused for new/edit forms) ────────────────────────── -->
+<div id="modal-overlay" class="overlay" hidden>
+  <div class="sheet" id="modal-sheet"></div>
+</div>
+
+<script src="/app.js"></script>
 </body>
 </html>
