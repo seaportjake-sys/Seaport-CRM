@@ -147,7 +147,10 @@ async function boot() {
   // Try to swap in a real logo if one was uploaded to /logo.png.
   fetch('/logo.png', { method: 'HEAD' }).then((r) => {
     if (r.ok) {
-      $('#brand-logo').innerHTML = '<img src="/logo.png" alt="Seaport Inlet Marina" />';
+      const img = '<img src="/logo.png" alt="Seaport Inlet Marina" />';
+      ['#brand-logo', '#brand-logo-side'].forEach((sel) => {
+        const el = $(sel); if (el) el.innerHTML = img;
+      });
     }
   }).catch(() => {});
 
@@ -168,18 +171,22 @@ async function reloadAll() {
   renderCurrentTab();
 }
 
-// ── Bottom nav ─────────────────────────────────────────────────────────
-$$('#bottombar .nav-item').forEach((btn) => {
+// ── Nav (bottom on mobile, sidebar on desktop) ─────────────────────────
+$$('#bottombar .nav-item, #sidebar .nav-item').forEach((btn) => {
   btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+const TAB_TITLES = { leads: 'Leads', boats: 'Boats', deals: 'Deals', tools: 'Tools' };
+
 function switchTab(name) {
-  if (!['leads','boats','deals','tools'].includes(name)) name = 'leads';
+  if (!TAB_TITLES[name]) name = 'leads';
   state.currentTab = name;
   history.replaceState(null, '', '#/' + name);
 
   $$('.tab-page').forEach((p) => p.classList.toggle('active', p.id === 'page-' + name));
-  $$('#bottombar .nav-item').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  $$('#bottombar .nav-item, #sidebar .nav-item').forEach((b) =>
+    b.classList.toggle('active', b.dataset.tab === name));
+  $('#topbar').setAttribute('data-page-title', TAB_TITLES[name]);
 
   // Topbar action button changes per tab.
   const action = $('#topbar-action');
@@ -199,10 +206,19 @@ function renderCurrentTab() {
 
 function updateLeadsBadge() {
   const n = state.leads.filter(needsContact).length;
-  const badge = $('#leads-badge');
-  if (n > 0) { badge.textContent = String(n); badge.hidden = false; }
-  else       { badge.hidden = true; }
+  ['#leads-badge', '#sidebar-leads-badge'].forEach((sel) => {
+    const badge = $(sel); if (!badge) return;
+    if (n > 0) { badge.textContent = String(n); badge.hidden = false; }
+    else       { badge.hidden = true; }
+  });
 }
+
+// Sidebar logout (desktop only)
+const sideLogout = $('#sidebar-logout');
+if (sideLogout) sideLogout.addEventListener('click', () => {
+  document.cookie = 'seaport_auth=; Path=/; Max-Age=0';
+  location.reload();
+});
 
 // ──────────────────────────────────────────────────────────────────────
 // LEADS
@@ -860,68 +876,262 @@ function recalcAppraisal() {
   .forEach((id) => $('#'+id).addEventListener('input', recalcAppraisal));
 
 // ── Electronics Builder ──
-const ELECTRONICS_PRESETS = {
+//
+// Three brands × three packages. Each package is a fixed list of items with
+// estimated parts prices (the parts guy gets actual SKU/pricing on order).
+// Add-ons are independent toggles that layer onto any package; brand-specific
+// add-ons (extra MFD, autopilot, open array upgrade) auto-pick the right SKU
+// for the selected brand. Output is a printable / copy-able order sheet.
+//
+// Tweak the package contents or prices below to match your real catalog —
+// nothing else needs to change.
+
+const ELECTRONICS_PACKAGES = {
   Simrad: {
-    'Basic':         { total: 6500,  items: ['NSS9 Evo3S MFD', 'HALO20+ Radar', 'V60 VHF', 'B164 Transducer'] },
-    'Mid Range':     { total: 14800, items: ['NSS12 Evo3S MFD', 'HALO 2003 Open Array', 'IS42 Instruments', 'AP44 Autopilot'] },
-    'Full Offshore': { total: 32500, items: ['Dual NSS16 Evo3S', 'HALO 3006 6\' Radar', 'NAIS-500 AIS', 'AP70 Autopilot', 'StructureScan 3D'] },
-    'Custom':        { total: 0,     items: [] },
+    Basic: { label: 'Basic', items: [
+      { name: '12" Simrad NSS Evo3 MFD',                 qty: 1, price: 2200 },
+      { name: 'Simrad RS40 VHF Radio',                   qty: 1, price: 450  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+      { name: 'Simrad HALO20+ Dome Radar',               qty: 1, price: 2200 },
+    ]},
+    Mid: { label: 'Mid Range', items: [
+      { name: '16" Simrad NSS Evo3 MFD',                 qty: 1, price: 4200 },
+      { name: 'Simrad HALO20+ Dome Radar',               qty: 1, price: 2200 },
+      { name: 'Simrad RS40 VHF Radio',                   qty: 1, price: 450  },
+      { name: 'Fusion Apollo MS-RA770 Stereo',           qty: 1, price: 700  },
+      { name: 'Marine Speakers',                         qty: 6, price: 120  },
+      { name: 'Marine Amplifier',                        qty: 1, price: 600  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+    ]},
+    Top: { label: 'Top Tier', items: [
+      { name: '16" Simrad NSS Evo4 MFD',                 qty: 2, price: 4500 },
+      { name: 'Simrad HALO 2003 Open Array Radar',       qty: 1, price: 6200 },
+      { name: 'Simrad RS100-B VHF Radio (with AIS)',     qty: 1, price: 1100 },
+      { name: 'Simrad RS40 VHF Radio',                   qty: 1, price: 450  },
+      { name: 'Fusion Apollo MS-RA770 Stereo',           qty: 1, price: 700  },
+      { name: 'Marine Speakers',                         qty: 6, price: 120  },
+      { name: 'Marine Amplifier',                        qty: 1, price: 600  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+    ]},
   },
   Garmin: {
-    'Basic':         { total: 5800,  items: ['GPSMAP 943xsv', 'GMR 18 HD+', 'VHF 215', 'GT54UHD Transducer'] },
-    'Mid Range':     { total: 13900, items: ['GPSMAP 1243xsv', 'Fantom 24 Radar', 'GMI 20 Instrument', 'GHC 50 Autopilot'] },
-    'Full Offshore': { total: 31200, items: ['Dual GPSMAP 8624', 'GMR Fantom 504', 'AIS 800', 'Reactor 40 Autopilot', 'Panoptix LiveScope'] },
-    'Custom':        { total: 0,     items: [] },
+    Basic: { label: 'Basic', items: [
+      { name: '12" Garmin GPSMAP 1243xsv MFD',           qty: 1, price: 2400 },
+      { name: 'Garmin VHF 215 Radio',                    qty: 1, price: 450  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+      { name: 'Garmin GMR 18 HD3+ Dome Radar',           qty: 1, price: 1800 },
+    ]},
+    Mid: { label: 'Mid Range', items: [
+      { name: '16" Garmin GPSMAP 8616xsv MFD',           qty: 1, price: 4500 },
+      { name: 'Garmin GMR 18 HD3+ Dome Radar',           qty: 1, price: 1800 },
+      { name: 'Garmin VHF 215 Radio',                    qty: 1, price: 450  },
+      { name: 'Fusion Apollo MS-RA770 Stereo',           qty: 1, price: 700  },
+      { name: 'Marine Speakers',                         qty: 6, price: 120  },
+      { name: 'Marine Amplifier',                        qty: 1, price: 600  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+    ]},
+    Top: { label: 'Top Tier', items: [
+      { name: '16" Garmin GPSMAP 8616xsv MFD',           qty: 2, price: 4500 },
+      { name: 'Garmin GMR Fantom 124 Open Array Radar',  qty: 1, price: 6500 },
+      { name: 'Garmin VHF 315 (with AIS)',               qty: 1, price: 850  },
+      { name: 'Garmin VHF 215 Radio',                    qty: 1, price: 450  },
+      { name: 'Fusion Apollo MS-RA770 Stereo',           qty: 1, price: 700  },
+      { name: 'Marine Speakers',                         qty: 6, price: 120  },
+      { name: 'Marine Amplifier',                        qty: 1, price: 600  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+    ]},
   },
-  Mixed: {
-    'Basic':         { total: 6100,  items: ['Simrad NSS9 + Garmin Radar'] },
-    'Mid Range':     { total: 14300, items: ['NSS12 Evo3S + Garmin Autopilot + JL Audio'] },
-    'Full Offshore': { total: 31800, items: ['Dual MFD setup, mixed brands offshore package'] },
-    'Custom':        { total: 0,     items: [] },
+  Raymarine: {
+    Basic: { label: 'Basic', items: [
+      { name: '12" Raymarine Axiom+ 12 MFD',             qty: 1, price: 2300 },
+      { name: 'Raymarine Ray73 VHF Radio',               qty: 1, price: 550  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+      { name: 'Raymarine Quantum 2 Q24D Dome Radar',     qty: 1, price: 2400 },
+    ]},
+    Mid: { label: 'Mid Range', items: [
+      { name: '16" Raymarine Axiom XL 16 MFD',           qty: 1, price: 4400 },
+      { name: 'Raymarine Quantum 2 Q24D Dome Radar',     qty: 1, price: 2400 },
+      { name: 'Raymarine Ray73 VHF Radio',               qty: 1, price: 550  },
+      { name: 'Fusion Apollo MS-RA770 Stereo',           qty: 1, price: 700  },
+      { name: 'Marine Speakers',                         qty: 6, price: 120  },
+      { name: 'Marine Amplifier',                        qty: 1, price: 600  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+    ]},
+    Top: { label: 'Top Tier', items: [
+      { name: '16" Raymarine Axiom XL 16 MFD',           qty: 2, price: 4400 },
+      { name: 'Raymarine Magnum 4kW Open Array Radar',   qty: 1, price: 6800 },
+      { name: 'Raymarine Ray90 VHF (with AIS)',          qty: 1, price: 950  },
+      { name: 'Raymarine Ray73 VHF Radio',               qty: 1, price: 550  },
+      { name: 'Fusion Apollo MS-RA770 Stereo',           qty: 1, price: 700  },
+      { name: 'Marine Speakers',                         qty: 6, price: 120  },
+      { name: 'Marine Amplifier',                        qty: 1, price: 600  },
+      { name: 'Airmar B175HW Thru-Hull Transducer',      qty: 1, price: 750  },
+    ]},
   },
 };
+
+const ELECTRONICS_ADDONS = [
+  { id: 'mfd12_extra',    label: 'Additional 12" MFD',                    qty: 1, price: 2200,
+    byBrand: { Simrad: '12" Simrad NSS Evo3 MFD',  Garmin: '12" Garmin GPSMAP 1243xsv MFD',  Raymarine: '12" Raymarine Axiom+ 12 MFD' } },
+  { id: 'mfd16_extra',    label: 'Additional 16" MFD',                    qty: 1, price: 4500,
+    byBrand: { Simrad: '16" Simrad NSS Evo3 MFD',  Garmin: '16" Garmin GPSMAP 8616xsv MFD', Raymarine: '16" Raymarine Axiom XL 16 MFD' } },
+  { id: 'autopilot',      label: 'Autopilot System',                      qty: 1, price: 4500,
+    byBrand: { Simrad: 'Simrad Continuum Autopilot', Garmin: 'Garmin Reactor 40 Autopilot', Raymarine: 'Raymarine Evolution EV-200 Autopilot' } },
+  { id: 'open_array_up',  label: 'Upgrade Dome → Open Array Radar',       qty: 1, price: 3500,
+    byBrand: { Simrad: 'Simrad HALO 2003 Open Array (upgrade)', Garmin: 'Garmin GMR Fantom 124 Open Array (upgrade)', Raymarine: 'Raymarine Magnum 4kW Open Array (upgrade)' } },
+  { id: 'transom_xducer', label: 'Transom-Mount Transducer',              qty: 1, price: 450, name: 'Airmar TM275LH-W Transom-Mount Transducer' },
+  { id: 'audio_pkg',      label: 'Add Audio Package (Stereo + 6 Spkr + Amp)', qty: 1, price: 2020,
+    name: 'Fusion Apollo MS-RA770 + 6× Marine Speakers + Marine Amplifier (full audio package)' },
+  { id: 'flir_m232',      label: 'FLIR M232 Thermal Night Vision Camera', qty: 1, price: 3700, name: 'FLIR M232 Thermal Night Vision Camera' },
+  { id: 'sionyx_nightwave', label: 'SiOnyx Nightwave Low-Light Camera',   qty: 1, price: 1700, name: 'SiOnyx Nightwave Color Low-Light Camera' },
+  { id: 'black_oak_lightbar', label: 'Black Oak Low-Profile LED Lightbar',qty: 1, price: 950,  name: 'Black Oak Low-Profile LED Lightbar' },
+  { id: 'starlink_mini',  label: 'Starlink Mini',                         qty: 1, price: 700,  name: 'Starlink Mini Satellite Internet' },
+];
+
 let elBrand  = 'Simrad';
 let elPreset = 'Basic';
+const elSelectedAddons = new Set();
 
-function recalcElectronics() {
-  const p = ELECTRONICS_PRESETS[elBrand][elPreset];
-  $('#el-total').textContent = money(p.total);
-  $('#el-result').innerHTML = `
-    <div class="label">${escapeHtml(elBrand)} · ${escapeHtml(elPreset)} · Estimated total (parts only, excl. labor)</div>
-    <div class="big">${money(p.total)}</div>
-    ${p.items.length ? `<div class="breakdown" style="grid-template-columns:1fr;text-align:left;">
-      ${p.items.map((i) => `<span>• ${escapeHtml(i)}</span>`).join('')}
-    </div>` : `<div class="breakdown" style="grid-template-columns:1fr;text-align:center;color:#cfd6e3;">Custom build — set total manually below.</div>`}
-  `;
+function elAddonName(addon) {
+  if (addon.byBrand) return addon.byBrand[elBrand] || addon.label;
+  return addon.name || addon.label;
 }
+
+function renderAddons() {
+  const root = $('#el-addons');
+  root.innerHTML = ELECTRONICS_ADDONS.map((a) => {
+    const checked = elSelectedAddons.has(a.id);
+    return `
+      <label class="addon-row ${checked ? 'checked' : ''}">
+        <input type="checkbox" data-addon="${a.id}" ${checked ? 'checked' : ''} />
+        <span class="addon-name">${escapeHtml(a.label)}</span>
+        <span class="addon-price">${money(a.price)}</span>
+      </label>`;
+  }).join('');
+  $$('#el-addons input').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const id = cb.dataset.addon;
+      if (cb.checked) elSelectedAddons.add(id); else elSelectedAddons.delete(id);
+      renderAddons();
+      renderOrderSheet();
+    });
+  });
+}
+
+function buildOrderItems() {
+  const pkg = ELECTRONICS_PACKAGES[elBrand][elPreset];
+  const base = pkg.items.map((i) => ({ ...i }));
+  const add  = ELECTRONICS_ADDONS
+    .filter((a) => elSelectedAddons.has(a.id))
+    .map((a) => ({ name: elAddonName(a), qty: a.qty, price: a.price }));
+  return base.concat(add);
+}
+
+function renderOrderSheet() {
+  const pkg      = ELECTRONICS_PACKAGES[elBrand][elPreset];
+  const items    = buildOrderItems();
+  const total    = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const customer = ($('#el-customer').value || '').trim() || '—';
+  const boat     = ($('#el-boat').value     || '').trim() || '—';
+  const date     = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  $('#el-order-sheet').innerHTML = `
+    <div class="order-sheet">
+      <h3>📋 Order Sheet — ${escapeHtml(elBrand)} ${escapeHtml(pkg.label)}</h3>
+      <div class="sheet-meta">
+        <strong>${escapeHtml(customer)}</strong> &middot; ${escapeHtml(boat)} &middot; ${escapeHtml(date)}
+      </div>
+      <table>
+        <thead>
+          <tr><th>Item</th><th class="qty">Qty</th><th class="price">Est. $</th></tr>
+        </thead>
+        <tbody>
+          ${items.map((i) => `
+            <tr>
+              <td>${escapeHtml(i.name)}</td>
+              <td class="qty">${i.qty}</td>
+              <td class="price">${money(i.price * i.qty)}</td>
+            </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Estimated Total — parts only, excl. labor</td>
+            <td class="qty"></td>
+            <td class="price">${money(total)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="actions">
+        <button type="button" class="btn-secondary" id="el-copy">📋 Copy</button>
+        <button type="button" class="btn-secondary" id="el-print">🖨️ Print</button>
+        <button type="button" class="btn-primary gold"  id="el-save">💾 Save to Customer</button>
+      </div>
+    </div>`;
+
+  $('#el-copy').onclick  = () => copyOrderSheet(items, total, customer, boat);
+  $('#el-print').onclick = () => window.print();
+  $('#el-save').onclick  = async () => {
+    const c = ($('#el-customer').value || '').trim();
+    if (!c) { toast('Enter a customer name first', 'error'); return; }
+    try {
+      await api('POST', '/electronics_builds', {
+        customer_name: c,
+        boat:          ($('#el-boat').value || '').trim(),
+        brand:         elBrand,
+        preset:        pkg.label,
+        total,
+        items:         JSON.stringify(items),
+      });
+      toast('Build saved to customer profile');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+}
+
+function copyOrderSheet(items, total, customer, boat) {
+  const lines = [
+    'Seaport Inlet Marina — Electronics Order Sheet',
+    `Date:     ${new Date().toLocaleDateString('en-US')}`,
+    `Customer: ${customer}`,
+    `Boat:     ${boat}`,
+    `Brand:    ${elBrand}`,
+    `Package:  ${ELECTRONICS_PACKAGES[elBrand][elPreset].label}`,
+    '',
+    'Items:',
+    ...items.map((i) => `  ${String(i.qty).padStart(2)}x  ${i.name}  (est ${money(i.price * i.qty)})`),
+    '',
+    `ESTIMATED TOTAL (parts only, excl. labor): ${money(total)}`,
+  ];
+  const text = lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => toast('Order sheet copied'),
+      () => toast('Copy failed — long-press to copy manually', 'error')
+    );
+  } else {
+    toast('Clipboard not available — use Print instead', 'error');
+  }
+}
+
 $$('#el-brand .choice').forEach((b) => {
   b.addEventListener('click', () => {
     elBrand = b.dataset.v;
     $$('#el-brand .choice').forEach((c) => c.classList.toggle('active', c === b));
-    recalcElectronics();
+    renderAddons();
+    renderOrderSheet();
   });
 });
 $$('#el-preset .choice').forEach((b) => {
   b.addEventListener('click', () => {
     elPreset = b.dataset.v;
     $$('#el-preset .choice').forEach((c) => c.classList.toggle('active', c === b));
-    recalcElectronics();
+    renderOrderSheet();
   });
 });
-$('#el-save').addEventListener('click', async () => {
-  const customer = $('#el-customer').value.trim();
-  const boat     = $('#el-boat').value.trim();
-  if (!customer) { toast('Enter a customer name first', 'error'); return; }
-  const p = ELECTRONICS_PRESETS[elBrand][elPreset];
-  try {
-    await api('POST', '/electronics_builds', {
-      customer_name: customer, boat, brand: elBrand, preset: elPreset,
-      total: p.total, items: JSON.stringify(p.items),
-    });
-    toast('Build saved');
-  } catch (e) { toast(e.message, 'error'); }
-});
-recalcElectronics();
+$('#el-customer').addEventListener('input', renderOrderSheet);
+$('#el-boat').addEventListener('input', renderOrderSheet);
+
+renderAddons();
+renderOrderSheet();
 recalcPayment();
 recalcAppraisal();
 

@@ -365,8 +365,166 @@ nav#bottombar .nav-item .badge {
 }
 .login-card .logo-wrap { display: flex; justify-content: center; }
 
-/* ── Tablet/desktop polish ─────────────────────────────────────────────── */
-@media (min-width: 720px) {
-  #app { max-width: 720px; margin: 0 auto; }
-  nav#bottombar { max-width: 720px; left: 50%; transform: translateX(-50%); border-radius: 0; }
+/* ── Desktop sidebar (hidden on mobile) ───────────────────────────────── */
+aside#sidebar { display: none; }
+
+/* Order sheet (printable) */
+.order-sheet {
+  background: #fff; color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; margin-top: 14px;
+}
+.order-sheet h3 { margin: 0 0 4px; color: var(--navy); }
+.order-sheet .sheet-meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.order-sheet table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.order-sheet th, .order-sheet td {
+  text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border);
+}
+.order-sheet th {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); font-weight: 600; background: #f6f8fb;
+}
+.order-sheet td.qty { width: 60px; text-align: center; font-weight: 600; }
+.order-sheet td.price { text-align: right; color: var(--muted); width: 90px; font-variant-numeric: tabular-nums; }
+.order-sheet tfoot td {
+  border-top: 2px solid var(--navy); border-bottom: 0;
+  font-weight: 700; padding-top: 10px;
+}
+.order-sheet .actions {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+.order-sheet .actions button { flex: 1; }
+
+.addon-grid {
+  display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px;
+}
+.addon-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: #fff; cursor: pointer;
+}
+.addon-row.checked { border-color: var(--gold); background: #fffaee; }
+.addon-row input { width: 18px; height: 18px; accent-color: var(--gold); }
+.addon-row .addon-name { flex: 1; font-weight: 500; }
+.addon-row .addon-price { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* ── Tablet/desktop layout (>= 900px) ─────────────────────────────────── */
+@media (min-width: 900px) {
+  body { background: #f0f2f6; }
+  #app {
+    flex-direction: row;
+    padding-bottom: 0;
+    min-height: 100vh;
+    max-width: none;
+  }
+  /* Topbar slimmed: sidebar shows the brand instead. */
+  header#topbar {
+    flex: 1; min-width: 0;
+    position: sticky; top: 0;
+    padding: 14px 28px;
+    background: #fff; color: var(--navy);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+  header#topbar .brand { display: none; }
+  header#topbar::before {
+    content: attr(data-page-title);
+    flex: 1; font-size: 18px; font-weight: 700; color: var(--navy);
+    text-transform: capitalize;
+  }
+
+  /* Sidebar */
+  aside#sidebar {
+    display: flex; flex-direction: column;
+    width: 248px; flex-shrink: 0;
+    background: var(--navy);
+    color: #fff;
+    padding: 20px 14px;
+    position: sticky; top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .side-brand {
+    display: flex; align-items: center; gap: 12px;
+    padding: 4px 8px 16px; margin-bottom: 8px;
+    border-bottom: 1px solid #1f3357;
+  }
+  .side-brand .brand-logo { width: 48px; height: 48px; }
+  .side-brand .brand-name {
+    font-size: 13px; color: var(--gold-soft); font-weight: 700; letter-spacing: .04em;
+    line-height: 1.2;
+  }
+  .side-brand .brand-tag {
+    font-size: 10px; color: #8a9ab2; letter-spacing: .14em;
+  }
+  .side-nav { flex: 1; display: flex; flex-direction: column; gap: 4px; padding-top: 12px; }
+  .side-nav .nav-item {
+    background: none; border: 0; cursor: pointer;
+    color: #8a9ab2;
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; border-radius: 10px;
+    font-size: 14px; font-weight: 600; letter-spacing: .04em;
+    width: 100%; text-align: left;
+    position: relative;
+  }
+  .side-nav .nav-item .nav-icon { font-size: 18px; }
+  .side-nav .nav-item:hover { background: var(--navy-soft); color: #fff; }
+  .side-nav .nav-item.active { background: var(--navy-soft); color: var(--gold); }
+  .side-nav .nav-item .badge {
+    position: static; margin-left: auto;
+    background: var(--need); color: #fff;
+    font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .sidebar-footer {
+    padding-top: 14px; border-top: 1px solid #1f3357;
+  }
+  .sidebar-footer button {
+    background: none; border: 0; color: #8a9ab2;
+    cursor: pointer; font-size: 13px;
+  }
+  .sidebar-footer button:hover { color: #fff; }
+
+  /* Main column */
+  #main-col {
+    display: flex; flex-direction: column;
+    flex: 1; min-width: 0;
+    min-height: 100vh;
+  }
+
+  /* Hide bottom nav on desktop */
+  nav#bottombar { display: none; }
+
+  /* Content padding & limits */
+  .tab-page { max-width: 1100px; margin: 0 auto; width: 100%; padding: 0 28px 32px; }
+  .status-strip { padding: 18px 0 0; }
+  .filter-row    { padding: 16px 0 8px; }
+  .search { margin: 4px 0 16px; }
+  .cards { padding: 0; gap: 12px; }
+  .tools-list { padding: 4px 0 32px; }
+
+  /* Cards in a 2-column grid on big screens */
+  @media (min-width: 1180px) {
+    .cards { display: grid; grid-template-columns: 1fr 1fr; }
+  }
+
+  /* Modal centered, smaller corner radius */
+  .overlay { align-items: center; }
+  .sheet { border-radius: 16px; max-width: 640px; }
+
+  /* Status cards bigger on desktop */
+  .status-card { flex: 0 0 130px; }
+
+  /* Topbar action button looks like a button on desktop */
+  .topbar-action {
+    background: var(--navy); color: var(--gold);
+  }
+  .topbar-action:hover { background: var(--navy-soft); color: var(--gold-soft); }
+}
+
+/* ── Print: just the order sheet ──────────────────────────────────────── */
+@media print {
+  body * { visibility: hidden; }
+  .order-sheet, .order-sheet * { visibility: visible; }
+  .order-sheet { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: 0; }
+  .order-sheet .actions { display: none; }
 }

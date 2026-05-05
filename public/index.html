@@ -14,8 +14,38 @@
 
 <div id="app">
 
+  <!-- ── Sidebar (desktop only) ────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="side-brand">
+      <div class="brand-logo" id="brand-logo-side">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-label="Seaport Inlet Marina">
+          <circle cx="32" cy="32" r="30" fill="#14253f"/>
+          <path d="M6 38 Q18 28 32 36 T58 36 L58 58 L6 58 Z" fill="#2e7d32"/>
+          <path d="M6 44 Q18 36 32 42 T58 44 L58 58 L6 58 Z" fill="#c4a861"/>
+          <path d="M6 50 Q18 44 32 48 T58 50 L58 58 L6 58 Z" fill="#d32f2f"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">SEAPORT INLET MARINA</div>
+        <div class="brand-tag">SALES PLATFORM</div>
+      </div>
+    </div>
+    <nav class="side-nav">
+      <button class="nav-item active" data-tab="leads"><span class="nav-icon">👥</span> Leads <span class="badge" id="sidebar-leads-badge" hidden>0</span></button>
+      <button class="nav-item"        data-tab="boats"><span class="nav-icon">🛥️</span> Boats</button>
+      <button class="nav-item"        data-tab="deals"><span class="nav-icon">🤝</span> Deals</button>
+      <button class="nav-item"        data-tab="tools"><span class="nav-icon">🧰</span> Tools</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button id="sidebar-logout">Log out</button>
+    </div>
+  </aside>
+
+  <!-- ── Main column wrapper for desktop layout ────────────────────────── -->
+  <div id="main-col">
+
   <!-- ── Header ────────────────────────────────────────────────────────── -->
-  <header id="topbar">
+  <header id="topbar" data-page-title="Leads">
     <div class="brand">
       <div class="brand-logo" id="brand-logo">
         <!-- Placeholder logo. Drop a real one at /public/logo.png and the JS
@@ -178,7 +208,7 @@
           <div class="tool-icon">📡</div>
           <div>
             <div class="tool-title">Electronics Builder</div>
-            <div class="tool-sub">Build out a customer electronics package</div>
+            <div class="tool-sub">Pick brand + package + add-ons → order sheet</div>
           </div>
           <div class="chev">▾</div>
         </div>
@@ -186,41 +216,41 @@
           <div class="form-grid">
             <div class="field">
               <label class="field-label">Customer</label>
-              <input id="el-customer" type="text" placeholder="Steve Arlotta" />
+              <input id="el-customer" type="text" placeholder="Customer name" />
             </div>
             <div class="field">
               <label class="field-label">Boat</label>
               <input id="el-boat" type="text" placeholder="2025 Cape Horn 36T" />
             </div>
             <div class="field full">
-              <label class="field-label">Brand Preference</label>
+              <label class="field-label">Brand</label>
               <div class="choice-row" id="el-brand">
                 <button type="button" class="choice active" data-v="Simrad">Simrad</button>
                 <button type="button" class="choice" data-v="Garmin">Garmin</button>
-                <button type="button" class="choice" data-v="Mixed">Mixed</button>
+                <button type="button" class="choice" data-v="Raymarine">Raymarine</button>
               </div>
             </div>
             <div class="field full">
-              <label class="field-label">Package Preset</label>
+              <label class="field-label">Base Package</label>
               <div class="choice-row" id="el-preset">
                 <button type="button" class="choice active" data-v="Basic">Basic</button>
-                <button type="button" class="choice" data-v="Mid Range">Mid Range</button>
-                <button type="button" class="choice" data-v="Full Offshore">Full Offshore</button>
-                <button type="button" class="choice" data-v="Custom">Custom</button>
+                <button type="button" class="choice" data-v="Mid">Mid Range</button>
+                <button type="button" class="choice" data-v="Top">Top Tier</button>
               </div>
             </div>
+            <div class="field full">
+              <label class="field-label">Add-Ons (any package)</label>
+              <div class="addon-grid" id="el-addons"></div>
+            </div>
           </div>
-          <div class="calc-result" id="el-result">
-            <div class="label">Estimated Package Total · Parts only, excl. labor</div>
-            <div class="big" id="el-total">$0</div>
-          </div>
-          <button class="btn-primary gold" id="el-save">💾 Save Build to Customer Profile</button>
+          <div id="el-order-sheet"></div>
         </div>
       </div>
 
     </div>
   </section>
 
+  </div> <!-- /#main-col -->
 </div>
 
 <!-- ── Bottom nav ─────────────────────────────────────────────────────── -->
