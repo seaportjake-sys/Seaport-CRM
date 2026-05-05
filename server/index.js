@@ -56,6 +56,25 @@ app.post('/api/_logout', (_req, res) => {
   res.json({ ok: true });
 });
 
+// Webhook for the daily follow-up email job. Hit by a GitHub Action every
+// morning. Gated by CRON_SECRET (sent in the X-Cron-Secret header) — NOT by
+// the user session, so the cron job doesn't need to be a logged-in user.
+app.post('/api/_cron/run-followups', async (req, res) => {
+  const expected = process.env.CRON_SECRET;
+  const supplied = req.headers['x-cron-secret'];
+  if (!expected || !supplied || expected !== supplied) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  try {
+    const { runFollowups } = require('./cron-followups');
+    const summary = await runFollowups();
+    res.json({ ok: true, ...summary });
+  } catch (e) {
+    console.error('[cron webhook] failed:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Returns the current logged-in user, or { user: null } if not logged in.
 app.get('/api/_me', async (req, res) => {
   const email = auth.getCurrentUserEmail(req);
@@ -69,9 +88,10 @@ app.get('/api/_me', async (req, res) => {
 // Authenticated endpoints
 // ─────────────────────────────────────────────────────────────────────────
 
-// Everything under /api except the auth endpoints above requires login.
+// Everything under /api except the auth + cron endpoints requires login.
+const PUBLIC_API_PATHS = new Set(['/_login', '/_logout', '/_me', '/_user_status']);
 app.use('/api', (req, res, next) => {
-  if (req.path === '/_login' || req.path === '/_logout' || req.path === '/_me' || req.path === '/_user_status') return next();
+  if (PUBLIC_API_PATHS.has(req.path) || req.path.startsWith('/_cron/')) return next();
   if (auth.getCurrentUserEmail(req)) return next();
   res.status(401).json({ error: 'Auth required' });
 });

@@ -1,25 +1,23 @@
 // Daily follow-up email job.
 //
-// Runs from a Render Cron Job (see render.yaml). Each morning it:
+// Two ways this can run:
+//   1. Inside the web service via POST /api/_cron/run-followups
+//      (gated by CRON_SECRET — that's how the daily GitHub Action triggers it).
+//   2. Standalone CLI: `node server/cron-followups.js`
+//      (handy for ad-hoc runs / local testing).
+//
+// Either way it:
 //   1. Finds all leads whose follow_up_date is on or before today.
 //   2. Groups them by salesperson (matched against the seeded user names).
 //   3. Sends each salesperson a single email of their day's follow-ups via Resend.
 //
-// Required env vars on the cron service:
+// Required env vars on the web service:
 //   DATABASE_URL       — wired automatically from the Postgres database
 //   RESEND_API_KEY     — get one free at resend.com (100 emails/day on free tier)
 //   RESEND_FROM        — verified sender (e.g. "Seaport CRM <crm@yourdomain.com>")
-//                        For testing, "Seaport CRM <onboarding@resend.dev>" works
-//                        but only sends to the email registered with Resend.
 //   APP_URL            — public URL of your CRM, used in email links
-//                        (e.g. https://seaport-crm-5qti.onrender.com)
 
-const { pool, query } = require('./db');
-const { SEED_USERS }  = require('./migrate');
-
-const RESEND_KEY  = process.env.RESEND_API_KEY;
-const RESEND_FROM = process.env.RESEND_FROM || 'Seaport CRM <onboarding@resend.dev>';
-const APP_URL     = process.env.APP_URL     || '';
+const { query } = require('./db');
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
@@ -33,38 +31,11 @@ function escapeHtml(s) {
     .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
 }
 
-async function getDueFollowUps() {
-  const today = todayISO();
-  const { rows } = await query(
-    `SELECT * FROM "leads" WHERE follow_up_date <= $1 ORDER BY follow_up_date ASC`,
-    [today]
-  );
-  return rows;
-}
-
-async function getUsers() {
-  const { rows } = await query('SELECT email, name FROM "users"');
-  return rows;
-}
-
-function groupByUser(leads, users) {
-  const userByName = Object.fromEntries(users.map((u) => [u.name.toLowerCase(), u]));
-  const groups = {};
-  const unassigned = [];
-  for (const lead of leads) {
-    const u = userByName[(lead.salesperson || '').toLowerCase()];
-    if (u) (groups[u.email] = groups[u.email] || { user: u, leads: [] }).leads.push(lead);
-    else   unassigned.push(lead);
-  }
-  return { groups, unassigned };
-}
-
-function renderEmail({ user, leads }) {
+function renderEmail({ user, leads, appUrl }) {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const rows = leads.map((l) => {
-    const url   = APP_URL ? `${APP_URL}/#/leads` : '#';
-    const due   = fmt(l.follow_up_date);
-    const last  = l.last_contact_date ? `Last: ${fmt(l.last_contact_date)}` : 'Never contacted';
+    const due  = fmt(l.follow_up_date);
+    const last = l.last_contact_date ? `Last: ${fmt(l.last_contact_date)}` : 'Never contacted';
     return `
       <tr>
         <td style="padding:12px 14px;border-bottom:1px solid #eee;">
@@ -87,47 +58,75 @@ function renderEmail({ user, leads }) {
     <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:0 0 10px 10px;overflow:hidden;">
       ${rows}
     </table>
-    ${APP_URL ? `<div style="text-align:center;margin-top:18px;">
-      <a href="${APP_URL}" style="background:#14253f;color:#c4a861;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:600;display:inline-block;">Open CRM</a>
+    ${appUrl ? `<div style="text-align:center;margin-top:18px;">
+      <a href="${appUrl}" style="background:#14253f;color:#c4a861;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:600;display:inline-block;">Open CRM</a>
     </div>` : ''}
     <div style="text-align:center;color:#aaa;font-size:11px;margin-top:18px;">Daily 7am follow-up summary · Seaport Inlet Marina CRM</div>
   </div>`;
 }
 
-async function sendEmail(to, subject, html) {
-  if (!RESEND_KEY) {
+async function sendEmail({ to, subject, html, fromAddr, key }) {
+  if (!key) {
     console.log('[cron] RESEND_API_KEY not set — would have emailed', to, ':', subject);
-    return;
+    return { ok: false, reason: 'no-key' };
   }
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_KEY}` },
-    body: JSON.stringify({ from: RESEND_FROM, to, subject, html }),
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({ from: fromAddr, to, subject, html }),
   });
   const text = await res.text();
-  if (!res.ok) console.error(`[cron] Resend ${res.status} for ${to}: ${text}`);
-  else         console.log(`[cron] sent to ${to} (${res.status})`);
+  if (!res.ok) {
+    console.error(`[cron] Resend ${res.status} for ${to}: ${text}`);
+    return { ok: false, status: res.status, body: text };
+  }
+  console.log(`[cron] sent to ${to} (${res.status})`);
+  return { ok: true };
 }
 
-async function main() {
-  console.log('[cron] starting follow-up run');
-  const leads = await getDueFollowUps();
+// Runs the full pipeline. Returns a summary {sent, skipped, unassigned}.
+async function runFollowups() {
+  const RESEND_KEY  = process.env.RESEND_API_KEY;
+  const RESEND_FROM = process.env.RESEND_FROM || 'Seaport CRM <onboarding@resend.dev>';
+  const APP_URL     = process.env.APP_URL     || '';
+
+  const today = todayISO();
+  const { rows: leads } = await query(
+    `SELECT * FROM "leads" WHERE follow_up_date <= $1 ORDER BY follow_up_date ASC`,
+    [today]
+  );
   if (!leads.length) {
     console.log('[cron] no follow-ups due today');
-    await pool.end();
-    return;
+    return { sent: 0, skipped: 0, unassigned: 0, total: 0 };
   }
-  const users = await getUsers();
-  const { groups, unassigned } = groupByUser(leads, users);
 
+  const { rows: users } = await query('SELECT email, name FROM "users"');
+  const userByName = Object.fromEntries(users.map((u) => [u.name.toLowerCase(), u]));
+
+  const groups = {};
+  let unassigned = 0;
+  for (const lead of leads) {
+    const u = userByName[(lead.salesperson || '').toLowerCase()];
+    if (u) (groups[u.email] = groups[u.email] || { user: u, leads: [] }).leads.push(lead);
+    else   unassigned++;
+  }
+
+  let sent = 0, skipped = 0;
   for (const { user, leads: dueLeads } of Object.values(groups)) {
-    await sendEmail(user.email, `${dueLeads.length} follow-up${dueLeads.length === 1 ? '' : 's'} for today`, renderEmail({ user, leads: dueLeads }));
+    const html = renderEmail({ user, leads: dueLeads, appUrl: APP_URL });
+    const subject = `${dueLeads.length} follow-up${dueLeads.length === 1 ? '' : 's'} for today`;
+    const r = await sendEmail({ to: user.email, subject, html, fromAddr: RESEND_FROM, key: RESEND_KEY });
+    if (r.ok) sent++; else skipped++;
   }
-  if (unassigned.length) {
-    console.log(`[cron] ${unassigned.length} leads have a salesperson with no matching user — skipped`);
-  }
-  await pool.end();
-  console.log('[cron] done');
+  return { sent, skipped, unassigned, total: leads.length };
 }
 
-main().catch((err) => { console.error('[cron] FAILED:', err); process.exit(1); });
+// CLI entry point: `node server/cron-followups.js`
+if (require.main === module) {
+  const { pool } = require('./db');
+  runFollowups()
+    .then(async (r) => { console.log('[cron] done:', r); await pool.end(); })
+    .catch(async (err) => { console.error('[cron] FAILED:', err); try { await pool.end(); } catch {} process.exit(1); });
+}
+
+module.exports = { runFollowups };
