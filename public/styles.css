@@ -79,6 +79,15 @@ header#topbar {
 }
 .topbar-action:hover { background: var(--gold-soft); }
 
+.topbar-user {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.2);
+  font-weight: 700; font-size: 13px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  margin-left: 4px;
+}
+.topbar-user:hover { background: rgba(255,255,255,.18); }
+
 /* ── Tab pages ─────────────────────────────────────────────────────────── */
 .tab-page { display: none; flex-direction: column; padding-bottom: 16px; }
 .tab-page.active { display: flex; }
@@ -393,6 +402,37 @@ aside#sidebar { display: none; }
   display: flex; gap: 8px; margin-top: 12px;
 }
 .order-sheet .actions button { flex: 1; }
+
+/* Activity timeline (lead detail) */
+.timeline {
+  margin-top: 16px; padding-left: 4px;
+  border-left: 2px solid var(--border);
+}
+.timeline-item {
+  position: relative; padding: 8px 0 8px 18px; margin-left: 4px;
+}
+.timeline-item::before {
+  content: ''; position: absolute; left: -7px; top: 14px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--gold);
+}
+.timeline-item.call    ::before { border-color: var(--cold); }
+.timeline-item.text    ::before { border-color: var(--cold); }
+.timeline-item.email   ::before { border-color: var(--cold); }
+.timeline-item.in_person::before { border-color: var(--warm); }
+.timeline-item.note    ::before { border-color: var(--gold); }
+.timeline-item.status_change::before { border-color: var(--hot); }
+.timeline-head {
+  font-weight: 600; color: var(--navy); font-size: 14px;
+  display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+}
+.timeline-head .who   { color: var(--muted); font-weight: 500; font-size: 13px; }
+.timeline-head .when  { color: var(--muted); font-weight: 500; font-size: 12px; margin-left: auto; }
+.timeline-note { color: var(--text); font-size: 13px; margin-top: 4px; white-space: pre-wrap; }
+.timeline-empty {
+  padding: 14px; color: var(--muted); font-size: 13px; text-align: center;
+  border: 1px dashed var(--border); border-radius: 10px;
+}
 
 .addon-grid {
   display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px;

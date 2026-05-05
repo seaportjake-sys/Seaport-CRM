@@ -73,11 +73,38 @@ const entities = {
     fields: [
       { name: 'customer_name', type: 'text' },
       { name: 'boat',          type: 'text' },
-      { name: 'brand',         type: 'text' },   // Simrad / Garmin / Mixed
-      { name: 'preset',        type: 'text' },   // Basic / Mid Range / Full Offshore / Custom
+      { name: 'brand',         type: 'text' },   // Simrad / Garmin / Raymarine
+      { name: 'preset',        type: 'text' },   // Basic / Mid Range / Top Tier
       { name: 'total',         type: 'number' },
       { name: 'items',         type: 'textarea' }, // JSON string of line items
       { name: 'notes',         type: 'textarea' },
+    ],
+  },
+
+  // Salespeople. Seeded on boot from SEED_USERS in migrate.js. Passwords are
+  // hashed (scrypt). Each user picks their own password on first login.
+  users: {
+    label: 'Users',
+    fields: [
+      { name: 'email',         type: 'text' },
+      { name: 'name',          type: 'text' },
+      { name: 'password_hash', type: 'text' },
+      { name: 'password_salt', type: 'text' },
+      { name: 'last_login_at', type: 'date' },
+    ],
+  },
+
+  // Per-lead chronological history (calls/texts/emails/notes/status changes).
+  // The "Log Contact" form creates these rather than appending to lead.notes.
+  lead_activities: {
+    label: 'Lead Activities',
+    fields: [
+      { name: 'lead_id',     type: 'foreign', references: 'leads' },
+      { name: 'user_email',  type: 'text' },                         // who logged it
+      { name: 'user_name',   type: 'text' },                         // denormalised for fast render
+      { name: 'type',        type: 'text' },                         // Call / Text / Email / In Person / Note / Status Change
+      { name: 'occurred_at', type: 'date' },
+      { name: 'note',        type: 'textarea' },
     ],
   },
 };

@@ -9,8 +9,8 @@ const $  = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 const state = {
-  authRequired: false,
-  authed:       true,
+  currentUser: null,        // { email, name } once logged in
+  users:       [],          // [{ email, name }] — directory of all salespeople
 
   leads:  [],
   boats:  [],
@@ -21,6 +21,8 @@ const state = {
   boatFilter:  'All',     // All / In Stock / Sold / On Order
   dealFilter:  'All',     // All / Active / Sold / Lost
   leadSearch:  '',
+  boatSearch:  '',
+  dealSearch:  '',
 };
 
 // ── API helper ─────────────────────────────────────────────────────────
@@ -42,13 +44,12 @@ async function api(method, path, body) {
   return data;
 }
 
-// ── Auth ───────────────────────────────────────────────────────────────
+// ── Auth (per-user email + password) ───────────────────────────────────
 async function checkAuth() {
   try {
-    const r = await fetch('/api/_authcheck').then((x) => x.json());
-    state.authRequired = !!r.authRequired;
-    state.authed       = !!r.authed;
-    if (state.authRequired && !state.authed) { showLogin(); return false; }
+    const { user } = await fetch('/api/_me').then((x) => x.json());
+    if (!user) { showLogin(); return false; }
+    state.currentUser = user;
     hideLogin();
     return true;
   } catch (e) {
@@ -56,13 +57,92 @@ async function checkAuth() {
     return false;
   }
 }
-function showLogin() { $('#login-overlay').hidden = false; setTimeout(() => $('#login-password').focus(), 50); }
+function showLogin() {
+  $('#login-overlay').hidden = false;
+  $('#login-password-form').hidden = true;
+  $('#login-email-form').hidden = false;
+  $('#login-error').hidden = true;
+  setTimeout(() => $('#login-email').focus(), 50);
+}
 function hideLogin() { $('#login-overlay').hidden = true; }
-$('#login-form').addEventListener('submit', async (e) => {
+
+let pendingEmail = '';
+let pendingNeedsSetup = false;
+
+$('#login-email-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('#login-error').hidden = true;
+  const email = $('#login-email').value.trim();
+  if (!email) return;
   try {
-    await api('POST', '/_login', { password: $('#login-password').value });
+    const r = await fetch('/api/_user_status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).then((x) => x.json());
+    if (!r.exists) {
+      $('#login-error').textContent = `No account for "${email}". Ask Jake to add you.`;
+      $('#login-error').hidden = false;
+      return;
+    }
+    pendingEmail        = email;
+    pendingNeedsSetup   = !r.hasPassword;
+    $('#login-subtitle').textContent =
+      pendingNeedsSetup
+        ? `First time, ${r.name}? Pick a password (at least 6 characters).`
+        : `Welcome back, ${r.name}.`;
+    $('#login-email-form').hidden = true;
+    $('#login-password-form').hidden = false;
+    $('#login-password').value = '';
+    $('#login-password-confirm').value = '';
+    $('#login-password-confirm').hidden = !pendingNeedsSetup;
+    $('#login-submit').textContent = pendingNeedsSetup ? 'Set password & log in' : 'Log in';
+    setTimeout(() => $('#login-password').focus(), 50);
+  } catch (err) {
+    $('#login-error').textContent = err.message;
+    $('#login-error').hidden = false;
+  }
+});
+
+$('#login-back').addEventListener('click', () => {
+  pendingEmail = '';
+  pendingNeedsSetup = false;
+  $('#login-subtitle').textContent = 'Sign in with your work email.';
+  $('#login-password-form').hidden = true;
+  $('#login-email-form').hidden = false;
+  $('#login-error').hidden = true;
+  setTimeout(() => $('#login-email').focus(), 50);
+});
+
+$('#login-password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#login-error').hidden = true;
+  const password = $('#login-password').value;
+  if (pendingNeedsSetup) {
+    if (password.length < 6) {
+      $('#login-error').textContent = 'Password must be at least 6 characters';
+      $('#login-error').hidden = false;
+      return;
+    }
+    if (password !== $('#login-password-confirm').value) {
+      $('#login-error').textContent = "Passwords don't match";
+      $('#login-error').hidden = false;
+      return;
+    }
+  }
+  try {
+    const r = await fetch('/api/_login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: pendingEmail, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      $('#login-error').textContent = data.error || 'Login failed';
+      $('#login-error').hidden = false;
+      return;
+    }
+    state.currentUser = data.user;
     hideLogin();
     boot();
   } catch (err) {
@@ -70,6 +150,13 @@ $('#login-form').addEventListener('submit', async (e) => {
     $('#login-error').hidden = false;
   }
 });
+
+async function logout() {
+  if (!confirm('Sign out?')) return;
+  try { await api('POST', '/_logout'); } catch {}
+  state.currentUser = null;
+  location.reload();
+}
 
 // ── Toast ──────────────────────────────────────────────────────────────
 function toast(msg, kind) {
@@ -148,27 +235,45 @@ async function boot() {
   fetch('/logo.png', { method: 'HEAD' }).then((r) => {
     if (r.ok) {
       const img = '<img src="/logo.png" alt="Seaport Inlet Marina" />';
-      ['#brand-logo', '#brand-logo-side'].forEach((sel) => {
+      ['#brand-logo', '#brand-logo-side', '#brand-logo-login'].forEach((sel) => {
         const el = $(sel); if (el) el.innerHTML = img;
       });
     }
   }).catch(() => {});
+
+  // Render current user in the topbar (mobile) — sidebar (desktop) has logout already.
+  if (state.currentUser) {
+    const chip = $('#topbar-user');
+    chip.hidden = false;
+    $('#topbar-user-initials').textContent = initials(state.currentUser.name);
+    chip.onclick = logout;
+  }
 
   await reloadAll();
   switchTab(location.hash.replace(/^#\//, '') || 'leads');
 }
 
 async function reloadAll() {
-  const [leads, boats, deals] = await Promise.all([
+  const [users, leads, boats, deals] = await Promise.all([
+    api('GET', '/users').catch(() => []),
     api('GET', '/leads').catch(() => []),
     api('GET', '/boats').catch(() => []),
     api('GET', '/deals').catch(() => []),
   ]);
+  state.users = users;
   state.leads = leads;
   state.boats = boats;
   state.deals = deals;
   updateLeadsBadge();
   renderCurrentTab();
+}
+
+// Build <option> list of salespeople from the loaded users directory.
+// Falls back gracefully if /api/users hasn't loaded yet.
+function salespersonOptions(selected) {
+  const names = state.users.length ? state.users.map((u) => u.name) : ['Jake', 'Theo', 'Robert'];
+  const opts  = names.concat(names.includes('Other') ? [] : ['Other']);
+  return opts.map((s) => `<option ${String(selected) === s ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('');
 }
 
 // ── Nav (bottom on mobile, sidebar on desktop) ─────────────────────────
@@ -215,17 +320,14 @@ function updateLeadsBadge() {
 
 // Sidebar logout (desktop only)
 const sideLogout = $('#sidebar-logout');
-if (sideLogout) sideLogout.addEventListener('click', () => {
-  document.cookie = 'seaport_auth=; Path=/; Max-Age=0';
-  location.reload();
-});
+if (sideLogout) sideLogout.addEventListener('click', logout);
 
 // ──────────────────────────────────────────────────────────────────────
 // LEADS
 // ──────────────────────────────────────────────────────────────────────
 const LEAD_STATUSES   = ['Hot', 'Warm', 'Cold'];
 const LEAD_FILTERS    = ['All', 'Hot', 'Warm', 'Cold', 'Need Contact'];
-const SALESPEOPLE     = ['Jake', 'Rob', 'Other'];
+// Salespeople come from /api/users (loaded in reloadAll). See salespersonOptions().
 const CONTACT_TYPES   = ['Call', 'Text', 'Email', 'In Person'];
 
 function renderLeadsView() {
@@ -273,6 +375,14 @@ function renderLeadFilters() {
 $('#lead-search').addEventListener('input', (e) => {
   state.leadSearch = e.target.value;
   renderLeadCards();
+});
+$('#boat-search').addEventListener('input', (e) => {
+  state.boatSearch = e.target.value;
+  renderBoatsView();
+});
+$('#deal-search').addEventListener('input', (e) => {
+  state.dealSearch = e.target.value;
+  renderDealsView();
 });
 
 function filteredLeads() {
@@ -340,9 +450,19 @@ function leadCardHtml(l) {
 }
 
 // ── Lead detail / form ──
-function openLeadDetail(id) {
+async function openLeadDetail(id) {
   const lead = state.leads.find((x) => x.id === id);
   if (!lead) return;
+
+  // Fetch the activity timeline for this lead.
+  let activities = [];
+  try { activities = await api('GET', `/lead_activities?lead_id=${lead.id}`); }
+  catch { /* show timeline as empty */ }
+
+  const timelineHtml = activities.length
+    ? `<div class="timeline">${activities.map(activityHtml).join('')}</div>`
+    : `<div class="timeline-empty">No contact history yet. Hit <strong>Log Contact</strong> below.</div>`;
+
   showSheet(`
     <h2>${escapeHtml(lead.name || 'Lead')}</h2>
     <div style="color:var(--muted);font-size:13px;margin-bottom:14px;">
@@ -366,7 +486,11 @@ function openLeadDetail(id) {
 
     ${lead.notes ? `<div class="field full"><label class="field-label">Notes</label><div style="background:#f6f8fb;border-radius:10px;padding:10px 12px;white-space:pre-wrap;">${escapeHtml(lead.notes)}</div></div>` : ''}
 
-    <button class="btn-primary gold" id="btn-log-contact">📝 Log Contact</button>
+    <div class="section-divider">📜 Activity Timeline</div>
+    ${timelineHtml}
+
+    <button class="btn-primary gold" id="btn-log-contact" style="margin-top:14px;">📝 Log Contact</button>
+    <button class="btn-secondary" id="btn-add-note">➕ Add Note</button>
     <button class="btn-primary" id="btn-build-deal">🤝 Build Deal</button>
     <div class="btn-row">
       <button class="btn-secondary" id="btn-edit-lead">Edit</button>
@@ -374,6 +498,7 @@ function openLeadDetail(id) {
     </div>
   `);
   $('#btn-log-contact').onclick = () => openLogContactForm(lead);
+  $('#btn-add-note').onclick    = () => openAddNoteForm(lead);
   $('#btn-build-deal').onclick  = () => openDealForm(null, lead);
   $('#btn-edit-lead').onclick   = () => openLeadForm(lead);
   $('#btn-delete-lead').onclick = async () => {
@@ -385,6 +510,39 @@ function openLeadDetail(id) {
       toast('Lead deleted');
     } catch (e) { toast(e.message, 'error'); }
   };
+}
+
+const ACTIVITY_ICONS = {
+  Call:           '📞',
+  Text:           '💬',
+  Email:          '✉️',
+  'In Person':    '🤝',
+  Note:           '📝',
+  'Status Change':'🔄',
+};
+function activityHtml(a) {
+  const icon = ACTIVITY_ICONS[a.type] || '•';
+  const cls  = (a.type || '').toLowerCase().replace(/\s+/g, '_');
+  return `
+    <div class="timeline-item ${cls}">
+      <div class="timeline-head">
+        <span>${icon} ${escapeHtml(a.type || 'Activity')}</span>
+        <span class="who">· ${escapeHtml(a.user_name || a.user_email || '')}</span>
+        <span class="when">${escapeHtml(shortDate(a.occurred_at) || shortDate(a.created_at) || '')}</span>
+      </div>
+      ${a.note ? `<div class="timeline-note">${escapeHtml(a.note)}</div>` : ''}
+    </div>`;
+}
+
+async function logActivity(lead, type, note, occurredAt) {
+  return api('POST', '/lead_activities', {
+    lead_id:     lead.id,
+    user_email:  state.currentUser ? state.currentUser.email : null,
+    user_name:   state.currentUser ? state.currentUser.name  : null,
+    type,
+    occurred_at: occurredAt || todayISO(),
+    note:        note || null,
+  });
 }
 
 function openLogContactForm(lead) {
@@ -425,18 +583,24 @@ function openLogContactForm(lead) {
   $('#log-contact-form').onsubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const note = fd.get('note');
+    const note         = fd.get('note');
+    const contactType  = fd.get('contact_type');
+    const date         = fd.get('last_contact_date');
+    const newStatus    = fd.get('status');
     const updated = {
-      contact_type:      fd.get('contact_type'),
-      last_contact_date: fd.get('last_contact_date'),
-      status:            fd.get('status'),
+      contact_type:      contactType,
+      last_contact_date: date,
+      status:            newStatus,
       follow_up_date:    fd.get('follow_up_date') || null,
-      notes: note ? `${shortDate(fd.get('last_contact_date'))} (${fd.get('contact_type')}): ${note}\n\n${lead.notes || ''}`.trim() : lead.notes,
     };
     try {
       await api('PUT', `/leads/${lead.id}`, updated);
+      await logActivity(lead, contactType, note, date);
+      if (newStatus && newStatus !== lead.status) {
+        await logActivity(lead, 'Status Change', `${lead.status || '—'} → ${newStatus}`, date);
+      }
       await reloadAll();
-      closeSheet();
+      openLeadDetail(lead.id);
       toast('Contact logged');
     } catch (err) { toast(err.message, 'error'); }
   };
@@ -444,7 +608,8 @@ function openLogContactForm(lead) {
 
 function openLeadForm(lead) {
   const editing = !!(lead && lead.id);
-  const l = lead || { status: 'Warm', salesperson: 'Jake', contact_type: 'Call', first_contact_date: todayISO() };
+  const meName = state.currentUser ? state.currentUser.name : 'Jake';
+  const l = lead || { status: 'Warm', salesperson: meName, contact_type: 'Call', first_contact_date: todayISO() };
   showSheet(`
     <h2>${editing ? 'Edit Lead' : 'New Lead'}</h2>
     <form id="lead-form">
@@ -482,7 +647,7 @@ function openLeadForm(lead) {
         <div class="field">
           <label class="field-label">Salesperson</label>
           <select name="salesperson">
-            ${SALESPEOPLE.map((s) => `<option ${l.salesperson === s ? 'selected' : ''}>${s}</option>`).join('')}
+            ${salespersonOptions(l.salesperson)}
           </select>
         </div>
         <div class="field">
@@ -515,11 +680,53 @@ function openLeadForm(lead) {
     const data = {};
     fd.forEach((v, k) => { data[k] = v === '' ? null : v; });
     try {
-      if (editing) await api('PUT',  `/leads/${l.id}`, data);
-      else         await api('POST', `/leads`, data);
+      let saved;
+      if (editing) {
+        saved = await api('PUT',  `/leads/${l.id}`, data);
+        // Auto-log a status-change activity if the status was edited.
+        if (data.status && data.status !== l.status) {
+          await logActivity(saved, 'Status Change', `${l.status || '—'} → ${data.status}`);
+        }
+      } else {
+        saved = await api('POST', `/leads`, data);
+        // Auto-log creation as the first activity.
+        await logActivity(saved, 'Note', `Lead created`);
+      }
       await reloadAll();
       closeSheet();
       toast(editing ? 'Lead saved' : 'Lead added');
+    } catch (err) { toast(err.message, 'error'); }
+  };
+}
+
+// Add a free-form note to a lead (separate from contact logging).
+function openAddNoteForm(lead) {
+  showSheet(`
+    <h2>Add Note · ${escapeHtml(lead.name)}</h2>
+    <form id="note-form">
+      <div class="form-grid">
+        <div class="field full">
+          <label class="field-label">Date</label>
+          <input type="date" name="occurred_at" value="${todayISO()}" />
+        </div>
+        <div class="field full">
+          <label class="field-label">Note</label>
+          <textarea name="note" required autofocus placeholder="What happened, what to remember…"></textarea>
+        </div>
+      </div>
+      <button class="btn-primary gold" type="submit">Save Note</button>
+      <button class="btn-secondary" type="button" id="btn-cancel-note">Cancel</button>
+    </form>
+  `);
+  $('#btn-cancel-note').onclick = () => openLeadDetail(lead.id);
+  $('#note-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await logActivity(lead, 'Note', fd.get('note'), fd.get('occurred_at'));
+      await reloadAll();
+      openLeadDetail(lead.id);
+      toast('Note saved');
     } catch (err) { toast(err.message, 'error'); }
   };
 }
@@ -541,9 +748,16 @@ function renderBoatsView() {
   $$('#boat-filter-row .pill').forEach((p) => {
     p.addEventListener('click', () => { state.boatFilter = p.dataset.filter; renderBoatsView(); });
   });
+  $('#boat-search').value = state.boatSearch;
 
   let xs = state.boats.slice();
   if (state.boatFilter !== 'All') xs = xs.filter((b) => b.status === state.boatFilter);
+  if (state.boatSearch.trim()) {
+    const q = state.boatSearch.toLowerCase();
+    xs = xs.filter((b) => [
+      b.year, b.make, b.model, b.stock_number, b.location,
+    ].some((v) => String(v || '').toLowerCase().includes(q)));
+  }
   xs.sort((a, b) => (b.id || 0) - (a.id || 0));
 
   const root = $('#boat-cards');
@@ -644,9 +858,16 @@ function renderDealsView() {
   $$('#deal-filter-row .pill').forEach((p) => {
     p.addEventListener('click', () => { state.dealFilter = p.dataset.filter; renderDealsView(); });
   });
+  $('#deal-search').value = state.dealSearch;
 
   let xs = state.deals.slice();
   if (state.dealFilter !== 'All') xs = xs.filter((d) => d.status === state.dealFilter);
+  if (state.dealSearch.trim()) {
+    const q = state.dealSearch.toLowerCase();
+    xs = xs.filter((d) =>
+      (d.customer_name || '').toLowerCase().includes(q) ||
+      (d.boat || '').toLowerCase().includes(q));
+  }
   xs.sort((a, b) => (b.id || 0) - (a.id || 0));
 
   const root = $('#deal-cards');
@@ -699,7 +920,7 @@ function openDealForm(deal, fromLead) {
     sale_date:     todayISO(),
     status:        'Active',
     lead_id:       fromLead.id,
-  } : { status: 'Active', salesperson: 'Jake', sale_date: todayISO() });
+  } : { status: 'Active', salesperson: state.currentUser?.name || 'Jake', sale_date: todayISO() });
 
   const numField = (n, lbl, ph) => `
     <div class="field"><label class="field-label">${lbl}</label>
@@ -714,7 +935,7 @@ function openDealForm(deal, fromLead) {
         <div class="field full"><label class="field-label">Boat</label>
           <input name="boat" placeholder="2025 Cape Horn 28XS" value="${escapeHtml(d.boat || '')}" /></div>
         <div class="field"><label class="field-label">Salesperson</label>
-          <select name="salesperson">${SALESPEOPLE.map((s) => `<option ${d.salesperson === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+          <select name="salesperson">${salespersonOptions(d.salesperson)}</select></div>
         <div class="field"><label class="field-label">Sale Date</label>
           <input name="sale_date" type="date" value="${escapeHtml((d.sale_date || todayISO()).slice(0,10))}" /></div>
       </div>

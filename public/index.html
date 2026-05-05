@@ -64,6 +64,9 @@
       </div>
     </div>
     <button id="topbar-action" class="topbar-action" hidden></button>
+    <button id="topbar-user" class="topbar-user" title="Sign out" hidden>
+      <span id="topbar-user-initials">?</span>
+    </button>
   </header>
 
   <!-- ── Leads tab ─────────────────────────────────────────────────────── -->
@@ -83,12 +86,20 @@
   <!-- ── Boats tab ─────────────────────────────────────────────────────── -->
   <section class="tab-page" id="page-boats">
     <div class="filter-row" id="boat-filter-row"></div>
+    <div class="search">
+      <span>🔎</span>
+      <input id="boat-search" type="search" placeholder="Search year, make, model, stock #…" autocomplete="off" />
+    </div>
     <div class="cards" id="boat-cards"></div>
   </section>
 
   <!-- ── Deals tab ─────────────────────────────────────────────────────── -->
   <section class="tab-page" id="page-deals">
     <div class="filter-row" id="deal-filter-row"></div>
+    <div class="search">
+      <span>🔎</span>
+      <input id="deal-search" type="search" placeholder="Search customer or boat…" autocomplete="off" />
+    </div>
     <div class="cards" id="deal-cards"></div>
   </section>
 
@@ -272,9 +283,9 @@
 
 <!-- ── Login overlay ──────────────────────────────────────────────────── -->
 <div id="login-overlay" class="overlay" hidden style="align-items:center;">
-  <form id="login-form" class="login-card">
+  <div class="login-card" id="login-card">
     <div class="logo-wrap">
-      <div class="brand-logo" style="width:64px;height:64px;">
+      <div class="brand-logo" id="brand-logo-login" style="width:72px;height:72px;">
         <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
           <circle cx="32" cy="32" r="30" fill="#14253f"/>
           <path d="M6 38 Q18 28 32 36 T58 36 L58 58 L6 58 Z" fill="#2e7d32"/>
@@ -284,11 +295,27 @@
       </div>
     </div>
     <h2 style="margin:0;text-align:center;">Seaport Inlet Marina</h2>
-    <p style="text-align:center;color:var(--muted);margin:0;">This CRM is password-protected.</p>
-    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" required />
+    <p id="login-subtitle" style="text-align:center;color:var(--muted);margin:0;">Sign in with your work email.</p>
+
+    <!-- Step 1: email -->
+    <form id="login-email-form">
+      <input type="email" id="login-email" placeholder="you@seaportinletmarina.com"
+             autocomplete="email" required style="width:100%;" />
+      <button class="btn-primary gold" type="submit" style="margin-top:10px;">Continue</button>
+    </form>
+
+    <!-- Step 2: password (login OR first-time setup) -->
+    <form id="login-password-form" hidden>
+      <input type="password" id="login-password" placeholder="Password"
+             autocomplete="current-password" required minlength="6" style="width:100%;" />
+      <input type="password" id="login-password-confirm" placeholder="Confirm password"
+             autocomplete="new-password" required minlength="6" style="width:100%;margin-top:8px;" hidden />
+      <button class="btn-primary gold" type="submit" style="margin-top:10px;" id="login-submit">Log in</button>
+      <button type="button" class="btn-secondary" id="login-back" style="margin-top:8px;">Use a different email</button>
+    </form>
+
     <div id="login-error" style="color:var(--need);text-align:center;font-size:13px;" hidden></div>
-    <button class="btn-primary gold" type="submit">Log in</button>
-  </form>
+  </div>
 </div>
 
 <!-- ── Modal sheet (reused for new/edit forms) ────────────────────────── -->

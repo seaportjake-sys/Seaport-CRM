@@ -1,18 +1,25 @@
 // Generic CRUD route factory. One copy of the logic for every entity.
 //
 // Routes mounted at /api/:entity:
-//   GET    /api/:entity          → list (newest first)
-//   GET    /api/:entity/:id      → fetch one
-//   POST   /api/:entity          → create
-//   PUT    /api/:entity/:id      → update
-//   DELETE /api/:entity/:id      → delete
+//   GET    /api/:entity                    → list (optional ?field=value filters)
+//   GET    /api/:entity/:id                → fetch one
+//   POST   /api/:entity                    → create
+//   PUT    /api/:entity/:id                → update
+//   DELETE /api/:entity/:id                → delete
 //
-// Validates field names against entities.js so callers can't write to
-// arbitrary columns.
+// The "users" entity is intentionally NOT exposed here — auth-sensitive.
+// A read-only /api/users endpoint is mounted separately by server/index.js.
 
 const express = require('express');
 const { query } = require('./db');
 const { entities } = require('./entities');
+
+const PROTECTED_ENTITIES = new Set(['users']);
+
+// Some entities want a custom default sort.
+const SORT_BY = {
+  lead_activities: 'occurred_at DESC NULLS LAST, id DESC',
+};
 
 function pickAllowedFields(entityDef, body) {
   const out = {};
@@ -31,49 +38,50 @@ function pickAllowedFields(entityDef, body) {
 function buildRouter() {
   const router = express.Router();
 
-  // Schema endpoint — frontend reads this once on load to render itself.
-  router.get('/_schema', (_req, res) => {
-    res.json(entities);
-  });
+  router.get('/_schema', (_req, res) => res.json(entities));
 
   router.param('entity', (req, res, next, name) => {
     const def = entities[name];
     if (!def) return res.status(404).json({ error: `Unknown entity: ${name}` });
+    if (PROTECTED_ENTITIES.has(name)) return res.status(403).json({ error: 'Use the dedicated endpoint for this entity' });
     req.entityName = name;
     req.entityDef  = def;
     next();
   });
 
-  // LIST
+  // LIST  (with optional ?field=value filters, AND-combined)
   router.get('/:entity', async (req, res, next) => {
     try {
-      const { rows } = await query(
-        `SELECT * FROM "${req.entityName}" ORDER BY id DESC LIMIT 1000`
-      );
+      const where = [];
+      const params = [];
+      for (const [k, v] of Object.entries(req.query)) {
+        const f = req.entityDef.fields.find((f) => f.name === k);
+        if (!f) continue;
+        params.push(v);
+        where.push(`"${k}" = $${params.length}`);
+      }
+      const sort = SORT_BY[req.entityName] || 'id DESC';
+      const sql  = `SELECT * FROM "${req.entityName}"
+                     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+                     ORDER BY ${sort} LIMIT 1000`;
+      const { rows } = await query(sql, params);
       res.json(rows);
     } catch (e) { next(e); }
   });
 
-  // GET ONE
   router.get('/:entity/:id', async (req, res, next) => {
     try {
-      const { rows } = await query(
-        `SELECT * FROM "${req.entityName}" WHERE id = $1`,
-        [req.params.id]
-      );
+      const { rows } = await query(`SELECT * FROM "${req.entityName}" WHERE id = $1`, [req.params.id]);
       if (!rows[0]) return res.status(404).json({ error: 'Not found' });
       res.json(rows[0]);
     } catch (e) { next(e); }
   });
 
-  // CREATE
   router.post('/:entity', async (req, res, next) => {
     try {
       const data = pickAllowedFields(req.entityDef, req.body || {});
       const cols = Object.keys(data);
-      if (cols.length === 0) {
-        return res.status(400).json({ error: 'No valid fields supplied' });
-      }
+      if (!cols.length) return res.status(400).json({ error: 'No valid fields supplied' });
       const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
       const colList      = cols.map((c) => `"${c}"`).join(', ');
       const values       = cols.map((c) => data[c]);
@@ -85,22 +93,17 @@ function buildRouter() {
     } catch (e) { next(e); }
   });
 
-  // UPDATE
   router.put('/:entity/:id', async (req, res, next) => {
     try {
       const data = pickAllowedFields(req.entityDef, req.body || {});
       const cols = Object.keys(data);
-      if (cols.length === 0) {
-        return res.status(400).json({ error: 'No valid fields supplied' });
-      }
+      if (!cols.length) return res.status(400).json({ error: 'No valid fields supplied' });
       const setSql = cols.map((c, i) => `"${c}" = $${i + 1}`).join(', ');
       const values = cols.map((c) => data[c]);
       values.push(req.params.id);
       const { rows } = await query(
-        `UPDATE "${req.entityName}"
-            SET ${setSql}, updated_at = now()
-          WHERE id = $${values.length}
-          RETURNING *`,
+        `UPDATE "${req.entityName}" SET ${setSql}, updated_at = now()
+          WHERE id = $${values.length} RETURNING *`,
         values
       );
       if (!rows[0]) return res.status(404).json({ error: 'Not found' });
@@ -108,13 +111,9 @@ function buildRouter() {
     } catch (e) { next(e); }
   });
 
-  // DELETE
   router.delete('/:entity/:id', async (req, res, next) => {
     try {
-      const { rowCount } = await query(
-        `DELETE FROM "${req.entityName}" WHERE id = $1`,
-        [req.params.id]
-      );
+      const { rowCount } = await query(`DELETE FROM "${req.entityName}" WHERE id = $1`, [req.params.id]);
       if (!rowCount) return res.status(404).json({ error: 'Not found' });
       res.status(204).end();
     } catch (e) { next(e); }

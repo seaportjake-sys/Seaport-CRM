@@ -1,5 +1,6 @@
-# Render Blueprint: spins up a free Postgres + a web service and wires DATABASE_URL.
+# Render Blueprint: Postgres + web service + daily follow-up cron job.
 # Push this file to the repo, then in Render: New + → Blueprint → pick this repo.
+
 databases:
   - name: seaport-crm-db
     plan: free
@@ -7,6 +8,7 @@ databases:
     user: seaport_crm
 
 services:
+  # ── Web service ────────────────────────────────────────────────────────
   - type: web
     name: seaport-crm
     runtime: node
@@ -21,7 +23,39 @@ services:
           property: connectionString
       - key: NODE_ENV
         value: production
-      # Set a value to require a shared password to access the site.
-      # Leave blank to leave the CRM open.
-      - key: APP_PASSWORD
+      # Stable secret used to sign session cookies. Render generates it once.
+      - key: SESSION_SECRET
+        generateValue: true
+      # Set this to your CRM's public URL once known (e.g. https://seaport-crm-xxxx.onrender.com)
+      # so the daily emails include working links. Leave blank if you don't care.
+      - key: APP_URL
+        sync: false
+      # Resend API key for the daily follow-up email (optional — leave unset
+      # and the cron runs but doesn't actually send mail).
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+
+  # ── Daily follow-up cron job ──────────────────────────────────────────
+  # Runs at 12:00 UTC every day = 7:00am Eastern (8:00am during summer DST).
+  - type: cron
+    name: seaport-crm-followups
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server/cron-followups.js
+    schedule: '0 12 * * *'
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: seaport-crm-db
+          property: connectionString
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
         sync: false
