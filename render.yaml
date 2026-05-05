@@ -39,9 +39,12 @@ services:
       # so the daily emails include working links. Leave blank if you don't care.
       - key: APP_URL
         sync: false
-      # Resend API key for the daily follow-up email (optional — leave unset
+      # Gmail SMTP for the daily follow-up email (optional — leave unset
       # and the webhook runs but doesn't actually send mail, just logs).
-      - key: RESEND_API_KEY
+      # GMAIL_USER         = the Gmail address that sends the email
+      # GMAIL_APP_PASSWORD = 16-char Google App Password (NOT your Gmail password)
+      #                      Create one at https://myaccount.google.com/apppasswords
+      - key: GMAIL_USER
         sync: false
-      - key: RESEND_FROM
+      - key: GMAIL_APP_PASSWORD
         sync: false

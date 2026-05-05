@@ -12,12 +12,25 @@
 //   3. Sends each salesperson a single email of their day's follow-ups via Resend.
 //
 // Required env vars on the web service:
-//   DATABASE_URL       — wired automatically from the Postgres database
-//   RESEND_API_KEY     — get one free at resend.com (100 emails/day on free tier)
-//   RESEND_FROM        — verified sender (e.g. "Seaport CRM <crm@yourdomain.com>")
-//   APP_URL            — public URL of your CRM, used in email links
+//   DATABASE_URL          — wired automatically from the Postgres database
+//   GMAIL_USER            — Gmail address that sends the daily emails
+//                           (e.g. seaportjake@gmail.com or seaportcrm@gmail.com)
+//   GMAIL_APP_PASSWORD    — 16-char Google App Password for that account
+//                           (https://myaccount.google.com/apppasswords)
+//   APP_URL               — public URL of your CRM, used in email links
 
-const { query } = require('./db');
+const nodemailer = require('nodemailer');
+const { query }  = require('./db');
+
+let _transporter = null;
+function getTransporter() {
+  if (_transporter) return _transporter;
+  const user = process.env.GMAIL_USER;
+  const pass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, ''); // App Passwords are shown with spaces
+  if (!user || !pass) return null;
+  _transporter = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+  return _transporter;
+}
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
@@ -65,29 +78,26 @@ function renderEmail({ user, leads, appUrl }) {
   </div>`;
 }
 
-async function sendEmail({ to, subject, html, fromAddr, key }) {
-  if (!key) {
-    console.log('[cron] RESEND_API_KEY not set — would have emailed', to, ':', subject);
-    return { ok: false, reason: 'no-key' };
+async function sendEmail({ to, subject, html, fromAddr }) {
+  const t = getTransporter();
+  if (!t) {
+    console.log('[cron] GMAIL_USER/GMAIL_APP_PASSWORD not set — would have emailed', to, ':', subject);
+    return { ok: false, reason: 'no-creds' };
   }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({ from: fromAddr, to, subject, html }),
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    console.error(`[cron] Resend ${res.status} for ${to}: ${text}`);
-    return { ok: false, status: res.status, body: text };
+  try {
+    const info = await t.sendMail({ from: fromAddr, to, subject, html });
+    console.log(`[cron] sent to ${to}: ${info.response}`);
+    return { ok: true };
+  } catch (e) {
+    console.error(`[cron] Gmail send failed for ${to}: ${e.message}`);
+    return { ok: false, reason: 'send-failed', body: e.message };
   }
-  console.log(`[cron] sent to ${to} (${res.status})`);
-  return { ok: true };
 }
 
 // Runs the full pipeline. Returns a summary {sent, skipped, unassigned}.
 async function runFollowups() {
-  const RESEND_KEY  = process.env.RESEND_API_KEY;
-  const RESEND_FROM = process.env.RESEND_FROM || 'Seaport CRM <onboarding@resend.dev>';
+  const GMAIL_USER  = process.env.GMAIL_USER  || '';
+  const FROM_ADDR   = GMAIL_USER ? `Seaport CRM <${GMAIL_USER}>` : 'Seaport CRM';
   const APP_URL     = process.env.APP_URL     || '';
 
   const today = todayISO();
@@ -113,9 +123,9 @@ async function runFollowups() {
 
   let sent = 0, skipped = 0;
   for (const { user, leads: dueLeads } of Object.values(groups)) {
-    const html = renderEmail({ user, leads: dueLeads, appUrl: APP_URL });
+    const html    = renderEmail({ user, leads: dueLeads, appUrl: APP_URL });
     const subject = `${dueLeads.length} follow-up${dueLeads.length === 1 ? '' : 's'} for today`;
-    const r = await sendEmail({ to: user.email, subject, html, fromAddr: RESEND_FROM, key: RESEND_KEY });
+    const r       = await sendEmail({ to: user.email, subject, html, fromAddr: FROM_ADDR });
     if (r.ok) sent++; else skipped++;
   }
   return { sent, skipped, unassigned, total: leads.length };
