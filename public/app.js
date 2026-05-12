@@ -57,17 +57,35 @@ async function checkAuth() {
     return false;
   }
 }
-function showLogin() {
+function showLoginStep(step) {
   $('#login-overlay').hidden = false;
-  $('#login-password-form').hidden = true;
-  $('#login-email-form').hidden = false;
+  ['#login-email-form','#login-password-form','#login-forgot-form','#login-reset-form']
+    .forEach((s) => { const el = $(s); if (el) el.hidden = true; });
   $('#login-error').hidden = true;
-  setTimeout(() => $('#login-email').focus(), 50);
+  $('#login-success').hidden = true;
+  if (step === 'email') {
+    $('#login-email-form').hidden = false;
+    $('#login-subtitle').textContent = 'Sign in with your work email.';
+    setTimeout(() => $('#login-email').focus(), 50);
+  } else if (step === 'password') {
+    $('#login-password-form').hidden = false;
+    setTimeout(() => $('#login-password').focus(), 50);
+  } else if (step === 'forgot') {
+    $('#login-forgot-form').hidden = false;
+    $('#login-subtitle').textContent = 'Reset your password';
+    setTimeout(() => $('#login-forgot-email').focus(), 50);
+  } else if (step === 'reset') {
+    $('#login-reset-form').hidden = false;
+    $('#login-subtitle').textContent = 'Set a new password';
+    setTimeout(() => $('#login-reset-password').focus(), 50);
+  }
 }
+function showLogin() { showLoginStep('email'); }
 function hideLogin() { $('#login-overlay').hidden = true; }
 
 let pendingEmail = '';
 let pendingNeedsSetup = false;
+let pendingResetToken = '';
 
 $('#login-email-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -87,17 +105,16 @@ $('#login-email-form').addEventListener('submit', async (e) => {
     }
     pendingEmail        = email;
     pendingNeedsSetup   = !r.hasPassword;
-    $('#login-subtitle').textContent =
-      pendingNeedsSetup
-        ? `First time, ${r.name}? Pick a password (at least 6 characters).`
-        : `Welcome back, ${r.name}.`;
-    $('#login-email-form').hidden = true;
-    $('#login-password-form').hidden = false;
     $('#login-password').value = '';
     $('#login-password-confirm').value = '';
     $('#login-password-confirm').hidden = !pendingNeedsSetup;
     $('#login-submit').textContent = pendingNeedsSetup ? 'Set password & log in' : 'Log in';
-    setTimeout(() => $('#login-password').focus(), 50);
+    $('#login-forgot-link').hidden = pendingNeedsSetup;
+    showLoginStep('password');
+    $('#login-subtitle').textContent =
+      pendingNeedsSetup
+        ? `First time, ${r.name}? Pick a password (at least 6 characters).`
+        : `Welcome back, ${r.name}.`;
   } catch (err) {
     $('#login-error').textContent = err.message;
     $('#login-error').hidden = false;
@@ -107,11 +124,68 @@ $('#login-email-form').addEventListener('submit', async (e) => {
 $('#login-back').addEventListener('click', () => {
   pendingEmail = '';
   pendingNeedsSetup = false;
-  $('#login-subtitle').textContent = 'Sign in with your work email.';
-  $('#login-password-form').hidden = true;
-  $('#login-email-form').hidden = false;
+  showLoginStep('email');
+});
+
+// Forgot password flow
+$('#login-forgot-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  $('#login-forgot-email').value = pendingEmail || $('#login-email').value || '';
+  showLoginStep('forgot');
+});
+$('#login-forgot-back').addEventListener('click', () => showLoginStep('email'));
+$('#login-forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
   $('#login-error').hidden = true;
-  setTimeout(() => $('#login-email').focus(), 50);
+  $('#login-success').hidden = true;
+  const email = $('#login-forgot-email').value.trim();
+  if (!email) return;
+  try {
+    await fetch('/api/_request_reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    $('#login-success').textContent = `If ${email} is registered, a reset email is on its way. Check your inbox.`;
+    $('#login-success').hidden = false;
+  } catch (err) {
+    $('#login-error').textContent = err.message;
+    $('#login-error').hidden = false;
+  }
+});
+
+// Reset password (landing from email link)
+$('#login-reset-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#login-error').hidden = true;
+  const password = $('#login-reset-password').value;
+  const confirm  = $('#login-reset-confirm').value;
+  if (password !== confirm) {
+    $('#login-error').textContent = "Passwords don't match";
+    $('#login-error').hidden = false;
+    return;
+  }
+  try {
+    const r = await fetch('/api/_reset_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: pendingResetToken, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      $('#login-error').textContent = data.error || 'Reset failed';
+      $('#login-error').hidden = false;
+      return;
+    }
+    pendingResetToken = '';
+    history.replaceState(null, '', '#/leads');
+    $('#login-success').textContent = 'Password updated. Sign in below.';
+    showLoginStep('email');
+    $('#login-success').hidden = false;
+  } catch (err) {
+    $('#login-error').textContent = err.message;
+    $('#login-error').hidden = false;
+  }
 });
 
 $('#login-password-form').addEventListener('submit', async (e) => {
@@ -229,6 +303,15 @@ function needsContact(lead) {
 
 // ── Boot ───────────────────────────────────────────────────────────────
 async function boot() {
+  // If the URL is a password-reset link from email, intercept BEFORE auth.
+  const hash = location.hash || '';
+  const m = hash.match(/^#\/reset\?token=([^&]+)/);
+  if (m) {
+    pendingResetToken = decodeURIComponent(m[1]);
+    showLoginStep('reset');
+    return;
+  }
+
   if (!await checkAuth()) return;
 
   // Try to swap in a real logo if one was uploaded to /logo.png.
@@ -318,9 +401,47 @@ function updateLeadsBadge() {
   });
 }
 
-// Sidebar logout (desktop only)
+// Sidebar logout + change password (desktop sidebar)
 const sideLogout = $('#sidebar-logout');
 if (sideLogout) sideLogout.addEventListener('click', logout);
+
+const sideChangePw = $('#sidebar-change-password');
+if (sideChangePw) sideChangePw.addEventListener('click', openChangePasswordForm);
+
+function openChangePasswordForm() {
+  showSheet(`
+    <h2>Change Password</h2>
+    <form id="change-pw-form">
+      <div class="form-grid">
+        <div class="field full">
+          <label class="field-label">Current Password</label>
+          <input type="password" name="current" required minlength="6" autocomplete="current-password" />
+        </div>
+        <div class="field full">
+          <label class="field-label">New Password</label>
+          <input type="password" name="password" required minlength="6" autocomplete="new-password" />
+        </div>
+        <div class="field full">
+          <label class="field-label">Confirm New Password</label>
+          <input type="password" name="confirm" required minlength="6" autocomplete="new-password" />
+        </div>
+      </div>
+      <button class="btn-primary gold" type="submit">Update password</button>
+      <button type="button" class="btn-secondary" id="cancel-change-pw">Cancel</button>
+    </form>
+  `);
+  $('#cancel-change-pw').onclick = closeSheet;
+  $('#change-pw-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    if (fd.get('password') !== fd.get('confirm')) { toast("Passwords don't match", 'error'); return; }
+    try {
+      await api('POST', '/_change_password', { current: fd.get('current'), password: fd.get('password') });
+      closeSheet();
+      toast('Password changed');
+    } catch (err) { toast(err.message, 'error'); }
+  };
+}
 
 // ──────────────────────────────────────────────────────────────────────
 // LEADS
@@ -1207,6 +1328,10 @@ const ELECTRONICS_ADDONS = [
   { id: 'sionyx_nightwave', label: 'SiOnyx Nightwave Low-Light Camera',   qty: 1, price: 1700, name: 'SiOnyx Nightwave Color Low-Light Camera' },
   { id: 'black_oak_lightbar', label: 'Black Oak Low-Profile LED Lightbar',qty: 1, price: 950,  name: 'Black Oak Low-Profile LED Lightbar' },
   { id: 'starlink_mini',  label: 'Starlink Mini',                         qty: 1, price: 700,  name: 'Starlink Mini Satellite Internet' },
+  { id: 'humphree_27plus', label: 'Humphree Lightning L300 Trim Tabs — Ultimate Pkg (27ft+)', qty: 1, price: 13500,
+    name: 'Humphree Lightning L300 Trim Tabs — Ultimate Package (boats 27ft+)' },
+  { id: 'humphree_under27', label: 'Humphree Lightning L300 Trim Tabs — w/ Cruise Pkg (under 27ft)', qty: 1, price: 7500,
+    name: 'Humphree Lightning L300 Trim Tabs + Cruise Package (boats under 27ft)' },
 ];
 
 let elBrand  = 'Simrad';

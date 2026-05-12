@@ -19,18 +19,8 @@
 //                           (https://myaccount.google.com/apppasswords)
 //   APP_URL               — public URL of your CRM, used in email links
 
-const nodemailer = require('nodemailer');
 const { query }  = require('./db');
-
-let _transporter = null;
-function getTransporter() {
-  if (_transporter) return _transporter;
-  const user = process.env.GMAIL_USER;
-  const pass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, ''); // App Passwords are shown with spaces
-  if (!user || !pass) return null;
-  _transporter = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
-  return _transporter;
-}
+const mailer     = require('./mailer');
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
@@ -78,26 +68,8 @@ function renderEmail({ user, leads, appUrl }) {
   </div>`;
 }
 
-async function sendEmail({ to, subject, html, fromAddr }) {
-  const t = getTransporter();
-  if (!t) {
-    console.log('[cron] GMAIL_USER/GMAIL_APP_PASSWORD not set — would have emailed', to, ':', subject);
-    return { ok: false, reason: 'no-creds' };
-  }
-  try {
-    const info = await t.sendMail({ from: fromAddr, to, subject, html });
-    console.log(`[cron] sent to ${to}: ${info.response}`);
-    return { ok: true };
-  } catch (e) {
-    console.error(`[cron] Gmail send failed for ${to}: ${e.message}`);
-    return { ok: false, reason: 'send-failed', body: e.message };
-  }
-}
-
 // Runs the full pipeline. Returns a summary {sent, skipped, unassigned}.
 async function runFollowups() {
-  const GMAIL_USER  = process.env.GMAIL_USER  || '';
-  const FROM_ADDR   = GMAIL_USER ? `Seaport CRM <${GMAIL_USER}>` : 'Seaport CRM';
   const APP_URL     = process.env.APP_URL     || '';
 
   const today = todayISO();
@@ -125,7 +97,7 @@ async function runFollowups() {
   for (const { user, leads: dueLeads } of Object.values(groups)) {
     const html    = renderEmail({ user, leads: dueLeads, appUrl: APP_URL });
     const subject = `${dueLeads.length} follow-up${dueLeads.length === 1 ? '' : 's'} for today`;
-    const r       = await sendEmail({ to: user.email, subject, html, fromAddr: FROM_ADDR });
+    const r       = await mailer.sendMail({ to: user.email, subject, html });
     if (r.ok) sent++; else skipped++;
   }
   return { sent, skipped, unassigned, total: leads.length };

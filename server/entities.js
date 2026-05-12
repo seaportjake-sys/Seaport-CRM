@@ -86,11 +86,28 @@ const entities = {
   users: {
     label: 'Users',
     fields: [
-      { name: 'email',         type: 'text' },
-      { name: 'name',          type: 'text' },
-      { name: 'password_hash', type: 'text' },
-      { name: 'password_salt', type: 'text' },
-      { name: 'last_login_at', type: 'date' },
+      { name: 'email',                  type: 'text' },
+      { name: 'name',                   type: 'text' },
+      { name: 'password_hash',          type: 'text' },
+      { name: 'password_salt',          type: 'text' },
+      { name: 'last_login_at',          type: 'date' },
+      { name: 'password_reset_token',   type: 'text' },
+      { name: 'password_reset_expires', type: 'date' },
+    ],
+  },
+
+  // Filled-in legal documents (contracts, waivers, etc.) saved against a lead.
+  // The HTML is the rendered/filled version, so it can be re-printed exactly
+  // as it was at the time of saving.
+  customer_documents: {
+    label: 'Customer Documents',
+    fields: [
+      { name: 'lead_id',     type: 'foreign', references: 'leads' },
+      { name: 'kind',        type: 'text' },     // 'sales_contract' | 'survey_waiver' | etc.
+      { name: 'title',       type: 'text' },
+      { name: 'content_html',type: 'textarea' }, // the filled HTML
+      { name: 'fields_json', type: 'textarea' }, // JSON of the form values, for editing later
+      { name: 'created_by',  type: 'text' },     // email of the user who created it
     ],
   },
 

@@ -93,6 +93,54 @@ async function recordLogin(id) {
   await query('UPDATE "users" SET last_login_at = CURRENT_DATE WHERE id = $1', [id]);
 }
 
+// ─── Password reset tokens ────────────────────────────────────────────────
+// Random opaque tokens with a server-side expiry. One-shot — consuming the
+// token clears it and rotates the password. Tokens last 1 hour.
+const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+async function createResetToken(userId) {
+  const token   = crypto.randomBytes(24).toString('hex');
+  const expires = new Date(Date.now() + RESET_TTL_MS);
+  await query(
+    'UPDATE "users" SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3',
+    [token, expires, userId]
+  );
+  return token;
+}
+
+async function consumeResetToken(token, newPassword) {
+  if (!token || !newPassword) return { ok: false, reason: 'missing' };
+  if (newPassword.length < 6)  return { ok: false, reason: 'weak' };
+  const { rows } = await query(
+    `SELECT id, password_reset_expires FROM "users"
+      WHERE password_reset_token = $1 LIMIT 1`,
+    [token]
+  );
+  const u = rows[0];
+  if (!u) return { ok: false, reason: 'invalid' };
+  if (!u.password_reset_expires || new Date(u.password_reset_expires) < new Date()) {
+    return { ok: false, reason: 'expired' };
+  }
+  await setUserPassword(u.id, newPassword);
+  await query(
+    'UPDATE "users" SET password_reset_token = NULL, password_reset_expires = NULL WHERE id = $1',
+    [u.id]
+  );
+  return { ok: true, userId: u.id };
+}
+
+// Change password while logged in (requires the current password).
+async function changePassword(email, currentPassword, newPassword) {
+  if (!newPassword || newPassword.length < 6) return { ok: false, reason: 'weak' };
+  const u = await findUserByEmail(email);
+  if (!u || !u.password_hash) return { ok: false, reason: 'not-found' };
+  if (!verifyPassword(currentPassword, u.password_salt, u.password_hash)) {
+    return { ok: false, reason: 'wrong-current' };
+  }
+  await setUserPassword(u.id, newPassword);
+  return { ok: true };
+}
+
 // ─── Express middleware ───────────────────────────────────────────────────
 function requireAuth(req, res, next) {
   const email = getCurrentUserEmail(req);
@@ -105,5 +153,6 @@ module.exports = {
   hashPassword, verifyPassword,
   setSessionCookie, clearSessionCookie, getCurrentUserEmail,
   findUserByEmail, setUserPassword, recordLogin,
+  createResetToken, consumeResetToken, changePassword,
   requireAuth,
 };
